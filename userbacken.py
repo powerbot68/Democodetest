@@ -693,7 +693,7 @@ def execute_user_bot_broadcast_async(
                 f"<b>{escaped_title}</b>\n"
                 f"<code>{code_text}</code>\n"
                 f"📋 ចុច «ចម្លងកូដ» ដើម្បី Copy កូដ។\n"
-                f"✨ សូមបើក Mini App ដើម្បីស្វែងរក និងមើលរឿងនេះ។"
+                f"✨ សូមបើក Mini App រួចបញ្ចូលកូដនេះក្នុងប្រអប់ស្វែងរក ដើម្បីមើលរឿង។"
             )
 
             # Ensure cover_file_id is valid for this User Bot Token if we need send_photo fallback
