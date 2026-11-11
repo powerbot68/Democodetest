@@ -668,17 +668,26 @@ def execute_user_bot_broadcast_async(
             cover_msg_id = int(custom_cover_msg_id) if custom_cover_msg_id else (int(db_cover_msg_id) if db_cover_msg_id else None)
             cover_file_id = (custom_cover_file_id or "").strip() or (db_cover_file_id or "").strip()
 
+            if not drama_code:
+                log.error("Cannot send new-drama notification without a real drama code: %s", drama_title)
+                if admin_chat_id:
+                    try:
+                        bot.send_message(int(admin_chat_id), f"⚠️ មិនអាចផ្ញើ Notification បានទេ ព្រោះរកមិនឃើញកូដពិតរបស់រឿង «{html.escape(drama_title)}»។")
+                    except Exception:
+                        log.warning("Could not report missing drama code to admin")
+                return
+
             # Only provide a copy-code action; no watch or channel-join buttons.
             copy_markup = InlineKeyboardMarkup()
             copy_markup.add(
                 InlineKeyboardButton(
                     "📋 ចម្លងកូដ",
-                    copy_text=CopyTextButton(text=drama_code or "XF-000001"),
+                    copy_text=CopyTextButton(text=drama_code),
                 )
             )
 
             escaped_title = html.escape(drama_title)
-            code_text = html.escape(drama_code or "XF-000001")
+            code_text = html.escape(drama_code)
             caption_text = (
                 f"🔥 <b>រឿងថ្មីទើបមកដល់ក្នុង {CHANNEL_DISPLAY_NAME}!</b>\n"
                 f"<b>{escaped_title}</b>\n"
