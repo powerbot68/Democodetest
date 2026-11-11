@@ -1608,6 +1608,14 @@ def broadcast_new_drama_notification_async(
             real_user_bot_token = get_resolved_user_bot_token()
             drama_code = ensure_drama_code(drama_title)
 
+            if not drama_code:
+                log.error("Cannot send new-drama notification without a real drama code: %s", drama_title)
+                try:
+                    bot.send_message(admin_chat_id, f"⚠️ មិនអាចផ្ញើ Notification បានទេ ព្រោះរកមិនឃើញកូដពិតរបស់រឿង «{html.escape(drama_title)}»។")
+                except Exception:
+                    pass
+                return
+
             # បើ Admin បាន Upload រូប Cover ថ្មីសម្រាប់ Notification បង្ហោះចូល Channel ដើម្បីទុក Message ID ឱ្យ User Bot ប្រើបានដែរ
             notif_channel_msg_id = int(custom_cover_msg_id) if custom_cover_msg_id else None
             if custom_cover_bytes and not notif_channel_msg_id:
@@ -1668,14 +1676,6 @@ def broadcast_new_drama_notification_async(
                     cover_bytes = bot.download_file(f_info.file_path)
                 except Exception:
                     cover_bytes = None
-
-            if not drama_code:
-                log.error("Cannot send new-drama notification without a real drama code: %s", drama_title)
-                try:
-                    bot.send_message(admin_chat_id, f"⚠️ មិនអាចផ្ញើ Notification បានទេ ព្រោះរកមិនឃើញកូដពិតរបស់រឿង «{html.escape(drama_title)}»។")
-                except Exception:
-                    pass
-                return
 
             # ប៊ូតុងនេះប្រើសម្រាប់ចម្លងកូដរឿងប៉ុណ្ណោះ មិនមានប៊ូតុងមើលរឿងទេ។
             copy_markup = InlineKeyboardMarkup()
