@@ -1693,7 +1693,7 @@ def broadcast_new_drama_notification_async(
                 f"<b>{escaped_title}</b>\n"
                 f"<code>{escaped_code}</code>\n"
                 f"📋 ចុច «ចម្លងកូដ» ដើម្បី Copy កូដ។\n"
-                f"✨ សូមបើក Mini App ដើម្បីស្វែងរក និងមើលរឿងនេះ។"
+                f"✨ សូមបើក Mini App រួចបញ្ចូលកូដនេះក្នុងប្រអប់ស្វែងរក ដើម្បីមើលរឿង។"
             )
 
             sent_ok = 0
