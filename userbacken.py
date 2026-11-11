@@ -3804,6 +3804,34 @@ def list_drama_episodes(
             pass
 
         enriched_episodes = []
+        episode_count = len(response.data or [])
+        per_episode_durations = {}
+        try:
+            duration_prefix = f"{EP_DUR_STORE_PREFIX}{drama_title}__"
+            duration_rows = (
+                supabase.table("drama_covers")
+                .select("drama_title, cover_file_id")
+                .like("drama_title", f"{duration_prefix}%")
+                .execute()
+            )
+            for duration_row in (duration_rows.data or []):
+                duration_key = str(duration_row.get("drama_title") or "")
+                suffix = duration_key[len(duration_prefix):] if duration_key.startswith(duration_prefix) else ""
+                raw_seconds = str(duration_row.get("cover_file_id") or "").strip()
+                if suffix.isdigit() and raw_seconds.isdigit() and int(raw_seconds) > 0:
+                    per_episode_durations[int(suffix)] = int(raw_seconds)
+        except Exception:
+            log.warning("Could not load episode durations for %s", drama_title)
+
+        episode_numbers = [int(r.get("ep_number") or 0) for r in (response.data or [])]
+        has_complete_durations = bool(episode_numbers) and all(number > 0 and number in per_episode_durations for number in episode_numbers)
+        if has_complete_durations:
+            total_episode_duration = sum(per_episode_durations[number] for number in episode_numbers)
+        elif episode_count == 1 and int(single_meta.get("duration_seconds") or 0) > 0:
+            total_episode_duration = int(single_meta["duration_seconds"])
+        else:
+            total_episode_duration = 0
+
         for r in (response.data or []):
             ep_num = int(r.get("ep_number") or 1)
             raw_cov_url = r.get("cover_url")
@@ -3819,14 +3847,16 @@ def list_drama_episodes(
                 "cover_url": raw_cov_url,
                 "cover_version": ep_ver,
                 "has_custom_cover": has_custom_ep_cov,
+                "duration_seconds": per_episode_durations.get(ep_num, 0),
             })
 
         return {
             "title": drama_title,
             "drama_code": single_meta["drama_code"],
             "upload_date": single_meta["upload_date"],
-            "duration_seconds": single_meta["duration_seconds"],
-            "duration_text": single_meta["duration_text"],
+            "duration_seconds": total_episode_duration,
+            "duration_text": format_video_duration(total_episode_duration) if total_episode_duration > 0 else "",
+            "episode_count": episode_count,
             "has_gif": single_meta["has_gif"],
             "gif_version": single_meta["gif_version"],
             "tags": single_meta["tags"],
