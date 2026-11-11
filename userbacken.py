@@ -4094,20 +4094,25 @@ def get_user_favorites_api(user_id: int):
                 headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"},
             )
 
-        ep_res = supabase.table("episodes").select("drama_title, cover_url, category, channel_msg_id").execute()
+        ep_res = supabase.table("episodes").select("drama_title, ep_number, cover_url, category, channel_msg_id").execute()
         active_dramas = OrderedDict()
         for r in (ep_res.data or []):
             t = (r.get("drama_title") or "").strip()
             if t and not is_internal_key(t):
                 msg_id = int(r.get("channel_msg_id") or 0)
+                ep_number = int(r.get("ep_number") or 0)
                 if t not in active_dramas:
                     active_dramas[t] = {
                         "cover_url": r.get("cover_url"),
                         "category": (r.get("category") or "").strip(),
                         "latest_id": msg_id,
+                        "episode_numbers": [ep_number] if ep_number > 0 else [],
                     }
-                elif msg_id > active_dramas[t]["latest_id"]:
-                    active_dramas[t]["latest_id"] = msg_id
+                else:
+                    if msg_id > active_dramas[t]["latest_id"]:
+                        active_dramas[t]["latest_id"] = msg_id
+                    if ep_number > 0:
+                        active_dramas[t]["episode_numbers"].append(ep_number)
 
         meta = fetch_all_drama_metadata_maps()
         ensure_codes_and_dates_for_dramas(active_dramas, meta)
@@ -4139,7 +4144,15 @@ def get_user_favorites_api(user_id: int):
             audio_type = determine_audio_type(title, langs_map.get(title))
             d_code = codes_map.get(title, "")
             u_date = upload_dates_map.get(title, get_cambodia_date_ddmmyyyy())
-            dur_sec = durations_map.get(title, 0)
+            episode_numbers = active_dramas[title].get("episode_numbers", [])
+            episode_count = len(episode_numbers)
+            per_episode = episode_durations_map.get(title, {})
+            if episode_count > 0 and all(number in per_episode for number in episode_numbers):
+                dur_sec = sum(int(per_episode[number]) for number in episode_numbers)
+            elif episode_count == 1 and durations_map.get(title, 0) > 0:
+                dur_sec = int(durations_map[title])
+            else:
+                dur_sec = 0
             gif_ver = gifs_map.get(title)
             cat_str = active_dramas[title]["category"]
             syn_str = synopses_map.get(title, "")
@@ -4151,6 +4164,7 @@ def get_user_favorites_api(user_id: int):
                 "upload_date": u_date,
                 "duration_seconds": dur_sec,
                 "duration_text": format_video_duration(dur_sec) if dur_sec > 0 else "",
+                "episode_count": episode_count,
                 "has_gif": bool(gif_ver),
                 "gif_version": gif_ver or "v1",
                 "cover_url": raw_cover,
@@ -4666,20 +4680,25 @@ def get_user_history_api(user_id: int):
                 headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"},
             )
 
-        ep_res = supabase.table("episodes").select("drama_title, cover_url, category, channel_msg_id").execute()
+        ep_res = supabase.table("episodes").select("drama_title, ep_number, cover_url, category, channel_msg_id").execute()
         active_dramas = OrderedDict()
         for r in (ep_res.data or []):
             t = (r.get("drama_title") or "").strip()
             if t and not is_internal_key(t):
                 msg_id = int(r.get("channel_msg_id") or 0)
+                ep_number = int(r.get("ep_number") or 0)
                 if t not in active_dramas:
                     active_dramas[t] = {
                         "cover_url": r.get("cover_url"),
                         "category": (r.get("category") or "").strip(),
                         "latest_id": msg_id,
+                        "episode_numbers": [ep_number] if ep_number > 0 else [],
                     }
-                elif msg_id > active_dramas[t]["latest_id"]:
-                    active_dramas[t]["latest_id"] = msg_id
+                else:
+                    if msg_id > active_dramas[t]["latest_id"]:
+                        active_dramas[t]["latest_id"] = msg_id
+                    if ep_number > 0:
+                        active_dramas[t]["episode_numbers"].append(ep_number)
 
         meta = fetch_all_drama_metadata_maps()
         ensure_codes_and_dates_for_dramas(active_dramas, meta)
@@ -4708,7 +4727,15 @@ def get_user_history_api(user_id: int):
             audio_type = determine_audio_type(title, langs_map.get(title))
             d_code = codes_map.get(title, "")
             u_date = upload_dates_map.get(title, get_cambodia_date_ddmmyyyy())
-            dur_sec = durations_map.get(title, 0)
+            episode_numbers = active_dramas[title].get("episode_numbers", [])
+            episode_count = len(episode_numbers)
+            per_episode = episode_durations_map.get(title, {})
+            if episode_count > 0 and all(number in per_episode for number in episode_numbers):
+                dur_sec = sum(int(per_episode[number]) for number in episode_numbers)
+            elif episode_count == 1 and durations_map.get(title, 0) > 0:
+                dur_sec = int(durations_map[title])
+            else:
+                dur_sec = 0
             gif_ver = gifs_map.get(title)
             cat_str = active_dramas[title]["category"]
             syn_str = synopses_map.get(title, "")
@@ -4720,6 +4747,7 @@ def get_user_history_api(user_id: int):
                 "upload_date": u_date,
                 "duration_seconds": dur_sec,
                 "duration_text": format_video_duration(dur_sec) if dur_sec > 0 else "",
+                "episode_count": episode_count,
                 "has_gif": bool(gif_ver),
                 "gif_version": gif_ver or "v1",
                 "last_ep": row.get("last_ep"),
