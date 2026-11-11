@@ -7,6 +7,7 @@ import logging
 import threading
 import json
 import hashlib
+import hmac
 import secrets
 import requests
 import tempfile
@@ -17,7 +18,7 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
-from urllib.parse import urlsplit
+from urllib.parse import parse_qsl, urlsplit
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -3335,6 +3336,59 @@ def health():
     }
 
 
+def get_verified_telegram_user_id(request: Request) -> Optional[int]:
+    """Return the Telegram user ID only when Telegram WebApp initData is valid."""
+    raw_init_data = request.headers.get("X-Telegram-Init-Data", "").strip()
+    if not raw_init_data or not BOT_TOKEN:
+        return None
+
+    try:
+        pairs = parse_qsl(raw_init_data, keep_blank_values=True, strict_parsing=True)
+        data = dict(pairs)
+        received_hash = data.pop("hash", "")
+        if not received_hash or len(received_hash) != 64:
+            return None
+
+        data_check_string = "\\n".join(
+            f"{key}={value}" for key, value in sorted(data.items())
+        )
+        secret_key = hmac.new(
+            b"WebAppData", BOT_TOKEN.encode("utf-8"), hashlib.sha256
+        ).digest()
+        calculated_hash = hmac.new(
+            secret_key, data_check_string.encode("utf-8"), hashlib.sha256
+        ).hexdigest()
+        if not hmac.compare_digest(calculated_hash, received_hash.lower()):
+            return None
+
+        auth_date = int(data.get("auth_date", "0"))
+        now = int(time.time())
+        if auth_date <= 0 or auth_date > now + 60 or now - auth_date > 86400:
+            return None
+
+        user_data = json.loads(data.get("user", "{}"))
+        user_id = int(user_data.get("id", 0))
+        return user_id if user_id > 0 else None
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return None
+    except Exception:
+        log.exception("Telegram initData verification failed")
+        return None
+
+
+def require_admin_request(
+    request: Request, claimed_user_id: Optional[int] = None
+) -> int:
+    verified_user_id = get_verified_telegram_user_id(request)
+    if not verified_user_id:
+        raise HTTPException(status_code=401, detail="Valid Telegram Mini App authentication required")
+    if claimed_user_id is not None and int(claimed_user_id) != verified_user_id:
+        raise HTTPException(status_code=403, detail="User identity mismatch")
+    if not is_admin_user(verified_user_id):
+        raise HTTPException(status_code=403, detail="Admin only")
+    return verified_user_id
+
+
 def require_internal_api_key(request: Request) -> None:
     supplied = request.headers.get("X-Internal-API-Key", "")
     if not INTERNAL_API_SECRET:
@@ -3371,8 +3425,11 @@ def update_required_channel_config_api(req: InternalChannelConfigRequest, reques
 
 
 @app.get("/api/admin/analytics")
-def get_admin_analytics_api(user_id: Optional[int] = Query(default=None)):
-    if not user_id or not is_admin_user(user_id):
+def get_admin_analytics_api(request: Request, user_id: Optional[int] = Query(default=None)):
+    try:
+        require_admin_request(request, user_id)
+    except HTTPException as exc:
+        return JSONResponse(status_code=exc.status_code, content={"is_admin": False, "detail": exc.detail})
         return JSONResponse(
             status_code=403,
             content={"is_admin": False, "detail": "Forbidden: Admin access only"},
@@ -3387,9 +3444,11 @@ def get_admin_analytics_api(user_id: Optional[int] = Query(default=None)):
 
 
 @app.post("/api/admin/toggle-trending")
-def admin_toggle_trending_api(req: AdminToggleTrendingRequest):
-    if not is_admin_user(req.user_id):
-        return JSONResponse(status_code=403, content={"detail": "Admin only"})
+def admin_toggle_trending_api(req: AdminToggleTrendingRequest, request: Request):
+    try:
+        require_admin_request(request, req.user_id)
+    except HTTPException as exc:
+        return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
     clean_title = (req.title or "").strip()
     if not clean_title:
@@ -3441,9 +3500,11 @@ def admin_toggle_trending_api(req: AdminToggleTrendingRequest):
 
 
 @app.post("/api/admin/upload-ep-cover")
-def admin_upload_episode_cover_api(req: AdminUploadEpCoverRequest):
-    if not is_admin_user(req.user_id):
-        return JSONResponse(status_code=403, content={"detail": "Admin only"})
+def admin_upload_episode_cover_api(req: AdminUploadEpCoverRequest, request: Request):
+    try:
+        require_admin_request(request, req.user_id)
+    except HTTPException as exc:
+        return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
     clean_title = (req.title or "").strip()
     ep_num = int(req.ep_number or 0)
@@ -3497,9 +3558,11 @@ def admin_upload_episode_cover_api(req: AdminUploadEpCoverRequest):
 
 
 @app.post("/api/admin/upload-album")
-def admin_upload_album_photo_api(req: AdminUploadAlbumRequest):
-    if not is_admin_user(req.user_id):
-        return JSONResponse(status_code=403, content={"detail": "Admin only"})
+def admin_upload_album_photo_api(req: AdminUploadAlbumRequest, request: Request):
+    try:
+        require_admin_request(request, req.user_id)
+    except HTTPException as exc:
+        return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
     clean_title = (req.title or "").strip()
     slot = int(req.slot or 0)
@@ -3553,9 +3616,11 @@ def admin_upload_album_photo_api(req: AdminUploadAlbumRequest):
 
 
 @app.post("/api/admin/delete-album")
-def admin_delete_album_photo_api(req: AdminDeleteAlbumRequest):
-    if not is_admin_user(req.user_id):
-        return JSONResponse(status_code=403, content={"detail": "Admin only"})
+def admin_delete_album_photo_api(req: AdminDeleteAlbumRequest, request: Request):
+    try:
+        require_admin_request(request, req.user_id)
+    except HTTPException as exc:
+        return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
     clean_title = (req.title or "").strip()
     if not clean_title:
