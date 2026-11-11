@@ -165,6 +165,9 @@ for key, value in [
 if missing:
     raise RuntimeError("Missing environment variables: " + ", ".join(missing))
 
+if len(INTERNAL_API_SECRET) < 32:
+    raise RuntimeError("INTERNAL_API_SECRET must contain at least 32 characters")
+
 CHANNEL_ID = _parse_int_safely(CHANNEL_ID_RAW, "CHANNEL_ID")
 REQUIRED_CHANNEL_ID = _parse_int_safely(
     os.getenv("REQUIRED_CHANNEL_ID", "-1004467396484"), "REQUIRED_CHANNEL_ID"
