@@ -144,6 +144,9 @@ missing = [name for name, value in required_settings.items() if not value]
 if missing:
     raise RuntimeError("Missing Render environment variables: " + ", ".join(missing))
 
+if len(INTERNAL_API_SECRET) < 32:
+    raise RuntimeError("INTERNAL_API_SECRET must contain at least 32 characters")
+
 ADMIN_ID_INT = _parse_int_safely(ADMIN_ID, "ADMIN_ID")
 CHANNEL_ID_VALUE = _parse_int_safely(CHANNEL_ID, "CHANNEL_ID")
 
