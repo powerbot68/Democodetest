@@ -3668,7 +3668,7 @@ def admin_delete_album_photo_api(req: AdminDeleteAlbumRequest, request: Request)
         return {"status": "ok"}
     except Exception as exc:
         log.exception("Failed to delete album photo")
-        return JSONResponse(status_code=500, content={"detail": str(exc)})
+        return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 
 @app.get("/api/dramas")
@@ -4140,7 +4140,7 @@ def submit_user_request_api(req: UserFeedbackRequest, request: Request):
         log.exception("Submit user request API failed")
         return JSONResponse(
             status_code=500,
-            content={"detail": str(exc)},
+            content={"detail": "Internal server error"},
         )
 
 
@@ -4173,7 +4173,7 @@ def toggle_favorite_api(req: FavoriteDramaRequest, request: Request):
         log.exception("Toggle favorite API failed")
         return JSONResponse(
             status_code=500,
-            content={"detail": str(exc)},
+            content={"detail": "Internal server error"},
         )
 
 
@@ -4330,7 +4330,7 @@ def select_drama_api(req: SelectDramaRequest, request: Request):
         log.exception("Select drama API failed")
         return JSONResponse(
             status_code=500,
-            content={"detail": str(exc)},
+            content={"detail": "Internal server error"},
         )
 
 
