@@ -17,6 +17,7 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
+from urllib.parse import urlsplit
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -26,7 +27,7 @@ except ImportError:
     cv2 = None
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, Query, Request
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from pydantic import BaseModel
@@ -81,6 +82,7 @@ NOTIF_STATS_KEY = "__CFG__NOTIF_STATS"
 NOTIF_WATCH_PREFIX = "__NOTIF_WATCH__"
 CHANNEL_DISPLAY_NAME = "χƒαη 18 קɭυѕ"
 ADMIN_BOT_TOKEN_FALLBACK = (os.getenv("ADMIN_BOT_TOKEN", "") or "").strip()
+INTERNAL_API_SECRET = (os.getenv("INTERNAL_API_SECRET", "") or "").strip()
 
 CAMBODIA_TZ = timezone(timedelta(hours=7))
 
@@ -695,14 +697,10 @@ def execute_user_bot_broadcast_async(
 
             escaped_title = html.escape(drama_title)
             code_text = html.escape(drama_code or "XF-000001")
-            duration_line = (
-                f" | ⏱️ រយៈពេល៖ {html.escape(single_meta['duration_text'])}"
-                if single_meta.get("duration_text") else ""
-            )
             caption_text = (
                 f"🔥 <b>រឿងថ្មីទើបមកដល់ក្នុង {CHANNEL_DISPLAY_NAME}!</b>\n"
-                f"🎬 ចំណងជើង៖ <b>{escaped_title}</b>\n"
-                f"🆔 លេខកូដ៖ <code>{code_text}</code>{duration_line}\n"
+                f"<b>{escaped_title}</b>\n"
+                f"<code>{code_text}</code>\n"
                 f"👇 ចុចប៊ូតុងខាងក្រោម ដើម្បីទទួលវីដេអូ!"
             )
 
@@ -3208,11 +3206,30 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+def _origin_from_url(value: str) -> Optional[str]:
+    try:
+        parsed = urlsplit((value or "").strip())
+        if parsed.scheme in ("http", "https") and parsed.netloc:
+            return f"{parsed.scheme}://{parsed.netloc}"
+    except Exception:
+        pass
+    return None
+
+
+_cors_origins = set()
+for _raw_origin in (
+    os.getenv("CORS_ALLOWED_ORIGINS", "").split(",")
+    + [MINI_APP_URL, os.getenv("PUBLIC_BASE_URL", ""), os.getenv("RENDER_EXTERNAL_URL", "")]
+):
+    _origin = _origin_from_url(_raw_origin)
+    if _origin:
+        _cors_origins.add(_origin)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
+    allow_origins=sorted(_cors_origins),
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
     expose_headers=["X-Cover-Fallback"],
 )
@@ -3330,8 +3347,17 @@ def health():
     }
 
 
+def require_internal_api_key(request: Request) -> None:
+    supplied = request.headers.get("X-Internal-API-Key", "")
+    if not INTERNAL_API_SECRET:
+        raise HTTPException(status_code=503, detail="Internal API authentication is not configured")
+    if not secrets.compare_digest(supplied, INTERNAL_API_SECRET):
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+
 @app.post("/api/internal/broadcast-notification")
-def trigger_user_bot_notification(req: InternalBroadcastRequest):
+def trigger_user_bot_notification(req: InternalBroadcastRequest, request: Request):
+    require_internal_api_key(request)
     clean_title = (req.drama_title or "").strip()
     if not clean_title:
         return JSONResponse(status_code=400, content={"detail": "Missing drama_title"})
@@ -3345,7 +3371,8 @@ def trigger_user_bot_notification(req: InternalBroadcastRequest):
 
 
 @app.post("/api/internal/channel-config")
-def update_required_channel_config_api(req: InternalChannelConfigRequest):
+def update_required_channel_config_api(req: InternalChannelConfigRequest, request: Request):
+    require_internal_api_key(request)
     cid, clink = save_required_channel_config_in_db(req.channel_id, req.channel_link)
     return {
         "status": "ok",
