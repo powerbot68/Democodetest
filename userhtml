@@ -377,6 +377,14 @@
     }
 
     .admin-top-btn:hover { background: #1f1216; }
+    .language-toggle {
+      min-width: 44px;
+      padding: 0 10px;
+      border-color: #303030;
+      background: #111111;
+      color: #ffffff;
+      font-weight: 700;
+    }
     .admin-top-btn:active { transform: scale(0.95); }
 
     .content { margin: 6px auto 0; }
@@ -1793,6 +1801,7 @@
             </svg>
           </span>
         </div>
+        <button type="button" id="language-toggle" class="admin-top-btn language-toggle" aria-label="Switch language">EN</button>
         <button type="button" id="admin-stats-btn" class="admin-top-btn hidden" title="ស្ថិតិអ្នកប្រើប្រាស់ (Admin Only)">
           <svg class="line-icon" viewBox="0 0 24 24" style="width:16px;height:16px;">
             <line x1="18" y1="20" x2="18" y2="10"></line>
@@ -2084,6 +2093,105 @@
 </nav>
 
 <script>
+(() => {
+  const LANGUAGE_KEY = "kmovie_ui_language";
+  const UI_TRANSLATIONS = {
+    "ស្វែងរកឈ្មោះរឿង, CODE (XF-000001), ប្រភេទ...": "Search title, CODE (XF-000001), category...",
+    "ស្ថិតិ": "Stats",
+    "រឿងពេញនិយម": "Popular",
+    "រឿងទាំងអស់": "All dramas",
+    "កំពុងផ្ទុក...": "Loading...",
+    "កំពុងទាញយកបញ្ជីរឿង...": "Loading drama list...",
+    "មុន": "Previous",
+    "បន្ទាប់": "Next",
+    "ត្រឡប់": "Back",
+    "កំពុងផ្ទុកភាគ...": "Loading videos...",
+    "កំពុងផ្ទុក Video...": "Loading videos...",
+    "ចំណាំ ៖": "Note:",
+    "នៅពេលអ្នកចុចមើលរឿង វីដេអូនឹងផ្ញើទៅ Chat Bot Telegram ស្វ័យប្រវត្តិ": "When you tap Watch, the video will be sent automatically to the Telegram bot.",
+    "រូប Album": "Album",
+    "ជ្រើសរើសភាគ": "Select video",
+    "ស្នើសុំផ្សេងៗទៅកាន់ Admin (១ថ្ងៃ/១ដង)": "Send a request to Admin (once per day)",
+    "គ្រុប Admin": "Admin group",
+    "សរសេរសំណើសុំរឿងថ្មី ឬរាយការណ៍បញ្ហាផ្សេងៗទៅកាន់ Admin...": "Request a new drama or report an issue to Admin...",
+    "ផ្ញើទៅ Admin": "Send to Admin",
+    "រឿងណែនាំ": "Recommended",
+    "ទំព័រដើម": "Home",
+    "ស្វែងរករឿង": "Search",
+    "រឿងរក្សាទុក": "Favorites",
+    "រឿងធ្លាប់មើល": "Watch history",
+    "ប្រភេទរឿង": "Categories",
+    "មើលរឿងពេញ": "Watch full movie",
+    "មិនទាន់មាន Video ទេ": "No videos available yet",
+    "មិនទាន់មាន Video": "No videos available",
+    "រកមិនឃើញរឿងដែលត្រូវគ្នាទេ។": "No matching dramas found.",
+    "មិនទាន់មានរឿងក្នុងបញ្ជីចូលចិត្តទេ។": "No favorite dramas yet.",
+    "មិនទាន់មានរឿងក្នុងបញ្ជីនេះទេ។": "No dramas in this list yet.",
+    "ព្យាយាមម្ដងទៀត": "Try again",
+    "មិនអាចផ្ទុកបាន": "Unable to load",
+    "មិនអាចទាញបញ្ជីរឿងបានទេ។ សូមពិនិត្យការភ្ជាប់ API រួចសាកម្ដងទៀត។": "Could not load dramas. Check the API connection and try again.",
+    "មិនអាចទាញប្រវត្តិរឿងបានទេ។ សូមសាកល្បងម្ដងទៀត។": "Could not load watch history. Please try again.",
+    "មិនអាចទាញបញ្ជីរឿងចូលចិត្តបានទេ។ សូមសាកល្បងម្ដងទៀត។": "Could not load favorites. Please try again.",
+    "សូមបើក Mini App ពីក្នុង Telegram Bot ដើម្បីអាចមើលប្រវត្តិរឿងបាន។": "Open the Mini App from the Telegram bot to view watch history.",
+    "រឿងធ្លាប់មើល": "Watch history",
+    "រឿងចូលចិត្ត": "Favorites",
+    "មួយភាគចប់ (Full)": "Full movie",
+    "បរាជ័យក្នុងការទាញភាគ": "Failed to load videos",
+    "មិនអាចផ្ទុកភាគ": "Unable to load videos",
+    "មិនអាចទាញយកបញ្ជីភាគបានទេ។": "Could not load the video list.",
+    "សូមបើក Mini App ពីក្នុង Telegram Bot ដើម្បីអាចប្រើមុខងារនេះបាន។": "Open the Mini App from the Telegram bot to use this feature."
+  };
+  let uiLanguage = localStorage.getItem(LANGUAGE_KEY) === "en" ? "en" : "km";
+  const languageButton = document.getElementById("language-toggle");
+  const translateText = value => {
+    if (uiLanguage !== "en") return value;
+    const trimmed = value.trim();
+    if (UI_TRANSLATIONS[trimmed]) return value.replace(trimmed, UI_TRANSLATIONS[trimmed]);
+    let match = trimmed.match(/^ទំព័រ (\d+)(?: \/ (\d+))?$/);
+    if (match) return value.replace(trimmed, `Page ${match[1]}${match[2] ? " / " + match[2] : ""}`);
+    match = trimmed.match(/^(\d+) រឿង$/);
+    if (match) return value.replace(trimmed, `${match[1]} dramas`);
+    match = trimmed.match(/^សរុប (\d+) Video$/);
+    if (match) return value.replace(trimmed, `Total ${match[1]} videos`);
+    return value;
+  };
+  const translateNode = node => {
+    if (node.nodeType === Node.TEXT_NODE && node.nodeValue.trim()) {
+      const translated = translateText(node.nodeValue);
+      if (translated !== node.nodeValue) node.nodeValue = translated;
+    } else if (node.nodeType === Node.ELEMENT_NODE) {
+      for (const attr of ["placeholder", "title", "aria-label"]) {
+        const value = node.getAttribute(attr);
+        if (value) {
+          const translated = translateText(value);
+          if (translated !== value) node.setAttribute(attr, translated);
+        }
+      }
+      node.childNodes.forEach(translateNode);
+    }
+  };
+  const applyLanguage = () => {
+    uiLanguage = uiLanguage === "en" ? "km" : "en";
+    localStorage.setItem(LANGUAGE_KEY, uiLanguage);
+    document.documentElement.lang = uiLanguage;
+    if (languageButton) languageButton.textContent = uiLanguage === "en" ? "ខ្មែរ" : "EN";
+    translateNode(document.body);
+  };
+  if (languageButton) {
+    languageButton.textContent = uiLanguage === "en" ? "ខ្មែរ" : "EN";
+    languageButton.addEventListener("click", applyLanguage);
+  }
+  if (uiLanguage === "en") translateNode(document.body);
+  const languageObserver = new MutationObserver(records => {
+    if (uiLanguage !== "en") return;
+    records.forEach(record => {
+      if (record.type === "characterData") translateNode(record.target);
+      else record.addedNodes.forEach(translateNode);
+    });
+  });
+  languageObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
+})();
+
 (() => {
   const API_BASE = window.location.origin && window.location.origin.startsWith("http")
     ? window.location.origin
