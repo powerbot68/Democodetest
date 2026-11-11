@@ -5062,7 +5062,12 @@ def health(background_tasks: BackgroundTasks):
 
 
 @app.get("/reset-webhook")
-def reset_webhook():
+def reset_webhook(request: Request):
+    supplied_secret = request.headers.get(
+        "X-Telegram-Bot-Api-Secret-Token", ""
+    )
+    if not WEBHOOK_SECRET or not secrets.compare_digest(supplied_secret, WEBHOOK_SECRET):
+        raise HTTPException(status_code=403, detail="Forbidden")
     ensure_webhook_active(force=True)
     info = bot.get_webhook_info()
     return {
