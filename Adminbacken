@@ -2346,10 +2346,13 @@ def save_episode_duration_in_db(drama_title, ep_number, duration_seconds):
     clean_title = (drama_title or "").strip()
     ep_num = int(ep_number or 0)
     seconds = int(duration_seconds or 0)
-    if not clean_title or ep_num < 1 or seconds <= 0:
+    if not clean_title or ep_num < 1:
         return
     key = f"{EP_DUR_STORE_PREFIX}{clean_title}__{ep_num}"
     try:
+        if seconds <= 0:
+            supabase.table("drama_covers").delete().eq("drama_title", key).execute()
+            return
         result = supabase.table("drama_covers").select("drama_title").eq("drama_title", key).limit(1).execute()
         payload = {"drama_title": key, "cover_file_id": str(seconds), "cover_channel_msg_id": 0}
         if result.data:
