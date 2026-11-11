@@ -2143,8 +2143,9 @@
   };
   let uiLanguage = localStorage.getItem(LANGUAGE_KEY) === "en" ? "en" : "km";
   const languageButton = document.getElementById("language-toggle");
+  const originalTextNodes = new WeakMap();
+  const originalAttributes = new WeakMap();
   const translateText = value => {
-    if (uiLanguage !== "en") return value;
     const trimmed = value.trim();
     if (UI_TRANSLATIONS[trimmed]) return value.replace(trimmed, UI_TRANSLATIONS[trimmed]);
     let match = trimmed.match(/^ទំព័រ (\d+)(?: \/ (\d+))?$/);
@@ -2157,13 +2158,19 @@
   };
   const translateNode = node => {
     if (node.nodeType === Node.TEXT_NODE && node.nodeValue.trim()) {
-      const translated = translateText(node.nodeValue);
+      if (!originalTextNodes.has(node)) originalTextNodes.set(node, node.nodeValue);
+      const original = originalTextNodes.get(node);
+      const translated = uiLanguage === "en" ? translateText(original) : original;
       if (translated !== node.nodeValue) node.nodeValue = translated;
     } else if (node.nodeType === Node.ELEMENT_NODE) {
+      let savedAttrs = originalAttributes.get(node);
+      if (!savedAttrs) { savedAttrs = {}; originalAttributes.set(node, savedAttrs); }
       for (const attr of ["placeholder", "title", "aria-label"]) {
         const value = node.getAttribute(attr);
-        if (value) {
-          const translated = translateText(value);
+        if (value && savedAttrs[attr] === undefined) savedAttrs[attr] = value;
+        const original = savedAttrs[attr];
+        if (original !== undefined) {
+          const translated = uiLanguage === "en" ? translateText(original) : original;
           if (translated !== value) node.setAttribute(attr, translated);
         }
       }
