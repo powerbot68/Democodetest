@@ -36,6 +36,7 @@ import telebot
 from telebot.types import (
     InlineKeyboardMarkup,
     InlineKeyboardButton,
+    CopyTextButton,
     ReplyKeyboardMarkup,
     KeyboardButton,
     WebAppInfo,
@@ -637,9 +638,8 @@ def execute_user_bot_broadcast_async(
     custom_cover_file_id: Optional[str] = None,
 ):
     """
-    Point 3.2: Sends Notification to User Bot Chat as a Cover Photo (supports Admin uploading
-    a new custom cover before broadcasting or using the existing drama cover), including
-    Drama Title + ID Code (e.g. XF-000001) and the '▶️ មើលឥឡូវនេះ' button.
+    Point 3.2: Sends a cover notification with the drama title, a copyable code,
+    and instructions to open the Mini App to find and watch the drama.
     """
     def _worker():
         try:
@@ -666,34 +666,14 @@ def execute_user_bot_broadcast_async(
             cover_msg_id = int(custom_cover_msg_id) if custom_cover_msg_id else (int(db_cover_msg_id) if db_cover_msg_id else None)
             cover_file_id = (custom_cover_file_id or "").strip() or (db_cover_file_id or "").strip()
 
-            # Force-join notification: show ONLY the Channel button first.
-            # The Watch button is revealed after Telegram confirms membership.
-            join_markup = InlineKeyboardMarkup()
-            watch_token = None
-            target_ep_num = 1
-            try:
-                available_eps = get_episode_rows(drama_title)
-                first_video_ep = next(
-                    (
-                        row for row in available_eps
-                        if row.get("channel_msg_id")
-                        and int(row.get("ep_number") or 0) > 0
-                    ),
-                    None,
+            # Only provide a copy-code action; no watch or channel-join buttons.
+            copy_markup = InlineKeyboardMarkup()
+            copy_markup.add(
+                InlineKeyboardButton(
+                    "📋 ចម្លងកូដ",
+                    copy_text=CopyTextButton(text=drama_code or "XF-000001"),
                 )
-                target_ep_num = int(first_video_ep["ep_number"]) if first_video_ep else 1
-                watch_token = create_notification_watch_token(drama_title, target_ep_num)
-                join_markup.add(
-                    InlineKeyboardButton(
-                        f"📢 ចូល Channel {CHANNEL_DISPLAY_NAME}",
-                        url=get_required_channel_link(),
-                    )
-                )
-            except Exception:
-                log.exception("Could not prepare notification join button for %s", drama_title)
-
-            if not join_markup.keyboard:
-                join_markup = None
+            )
 
             escaped_title = html.escape(drama_title)
             code_text = html.escape(drama_code or "XF-000001")
@@ -701,7 +681,8 @@ def execute_user_bot_broadcast_async(
                 f"🔥 <b>រឿងថ្មីទើបមកដល់ក្នុង {CHANNEL_DISPLAY_NAME}!</b>\n"
                 f"<b>{escaped_title}</b>\n"
                 f"<code>{code_text}</code>\n"
-                f"👇 ចុចប៊ូតុងខាងក្រោម ដើម្បីទទួលវីដេអូ!"
+                f"📋 ចុច «ចម្លងកូដ» ដើម្បី Copy កូដ។\n"
+                f"✨ សូមបើក Mini App ដើម្បីស្វែងរក និងមើលរឿងនេះ។"
             )
 
             # Ensure cover_file_id is valid for this User Bot Token if we need send_photo fallback
@@ -723,17 +704,7 @@ def execute_user_bot_broadcast_async(
 
             for uid in user_ids:
                 delivered = False
-                is_member_now = is_required_channel_member(int(uid))
-                markup = (
-                    InlineKeyboardMarkup().add(
-                        InlineKeyboardButton(
-                            "▶️ មើលឥឡូវនេះ",
-                            callback_data=f"notif_watch_{watch_token}",
-                        )
-                    )
-                    if is_member_now and watch_token
-                    else join_markup
-                )
+                markup = copy_markup
                 sent_message_id = None
 
                 if cover_msg_id:
@@ -779,13 +750,6 @@ def execute_user_bot_broadcast_async(
                         delivered = False
 
                 if delivered:
-                    if watch_token and sent_message_id and not is_member_now:
-                        PENDING_WATCH_AFTER_JOIN[int(uid)] = {
-                            "drama_title": drama_title,
-                            "ep_number": int(target_ep_num),
-                            "notif_msg_id": int(sent_message_id),
-                            "watch_token": watch_token,
-                        }
                     sent_ok += 1
                 else:
                     failed_count += 1
