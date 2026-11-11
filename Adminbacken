@@ -148,6 +148,9 @@ if missing:
 if len(INTERNAL_API_SECRET) < 32:
     raise RuntimeError("INTERNAL_API_SECRET must contain at least 32 characters")
 
+if not re.fullmatch(r"[A-Za-z0-9_-]{32,256}", WEBHOOK_SECRET or ""):
+    raise RuntimeError("WEBHOOK_SECRET must be 32-256 characters using letters, digits, '_' or '-'")
+
 ADMIN_ID_INT = _parse_int_safely(ADMIN_ID, "ADMIN_ID")
 CHANNEL_ID_VALUE = _parse_int_safely(CHANNEL_ID, "CHANNEL_ID")
 
