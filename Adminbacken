@@ -2905,12 +2905,9 @@ def handle_interactive_flow(message):
             f"🎬 ចំនួនរឿងសរុប៖ {stats['total_dramas']} រឿង\n"
             f"📺 ចំនួនភាគសរុប៖ {stats['total_episodes']} ភាគ\n"
             "━━━━━━━━━━━━━━━━━━\n"
-            "🔔 ស្ថិតិការផ្ញើ Notification (User Bot Chat)៖\n"
-            f"• ចំនួនដងផ្ញើសរុប៖ {ns.get('total_broadcasts', 0)} ដង\n"
-            f"• សារផ្ញើជោគជ័យសរុប៖ {ns.get('total_delivered', 0)} សារ\n"
-            f"• រឿងផ្ញើចុងក្រោយ៖ {ns.get('last_drama', 'មិនទាន់មាន')}\n"
-            f"• លទ្ធផលចុងក្រោយ៖ ជោគជ័យ {ns.get('last_sent_ok', 0)} / បរាជ័យ {ns.get('last_failed', 0)}\n"
-            f"• ពេលវេលាចុងក្រោយ៖ {ns.get('last_time', 'មិនទាន់មាន')}"
+            "🔔 ស្ថិតិអ្នកទទួល Notification៖\n"
+            f"• ចំនួនទទួលសរុប៖ {ns.get('total_delivered', 0)} នាក់\n"
+            f"• សកម្មថ្ងៃនេះ៖ {stats['active_users_today']} នាក់"
         )
         send_clean_message(message, report, reply_markup=main_menu_keyboard())
         return
