@@ -92,6 +92,7 @@ TAGS_STORE_PREFIX = "__TAGS__"
 GIF_STORE_PREFIX = "__GIF__"
 ALBUM_STORE_PREFIX = "__ALBUM__"
 EP_COV_STORE_PREFIX = "__EPCOV__"
+EP_DUR_STORE_PREFIX = "__EPDUR__"
 
 USER_START_KEY = "__USER_START__"
 CFG_ADMINS_KEY = "__CFG__ADMIN_IDS"
@@ -250,6 +251,7 @@ def is_internal_key(title: str) -> bool:
         or t.startswith(GIF_STORE_PREFIX)
         or t.startswith(ALBUM_STORE_PREFIX)
         or t.startswith(EP_COV_STORE_PREFIX)
+        or t.startswith(EP_DUR_STORE_PREFIX)
         or t.startswith("__NOTIF_WATCH__")
         or t == USER_START_KEY
         or t.startswith("__RATE__")
@@ -2340,7 +2342,25 @@ def find_episode(drama_title, ep_number):
     return result.data[0] if result.data else None
 
 
-def save_episode(drama_title, ep_number, channel_msg_id, cover_url=None, category=None):
+def save_episode_duration_in_db(drama_title, ep_number, duration_seconds):
+    clean_title = (drama_title or "").strip()
+    ep_num = int(ep_number or 0)
+    seconds = int(duration_seconds or 0)
+    if not clean_title or ep_num < 1 or seconds <= 0:
+        return
+    key = f"{EP_DUR_STORE_PREFIX}{clean_title}__{ep_num}"
+    try:
+        result = supabase.table("drama_covers").select("drama_title").eq("drama_title", key).limit(1).execute()
+        payload = {"drama_title": key, "cover_file_id": str(seconds), "cover_channel_msg_id": 0}
+        if result.data:
+            supabase.table("drama_covers").update(payload).eq("drama_title", key).execute()
+        else:
+            supabase.table("drama_covers").insert(payload).execute()
+    except Exception:
+        log.exception("Could not save duration for %s episode %s", clean_title, ep_num)
+
+
+def save_episode(drama_title, ep_number, channel_msg_id, cover_url=None, category=None, duration_seconds=None):
     existing = find_episode(drama_title, ep_number)
 
     data = {
@@ -2366,6 +2386,8 @@ def save_episode(drama_title, ep_number, channel_msg_id, cover_url=None, categor
     else:
         supabase.table("episodes").insert(data).execute()
 
+    if duration_seconds is not None:
+        save_episode_duration_in_db(drama_title, ep_number, duration_seconds)
     ensure_drama_code(drama_title)
     ensure_drama_upload_date(drama_title)
 
@@ -2430,6 +2452,7 @@ def update_drama_title_in_db(old_title, new_title):
             CODE_STORE_PREFIX,
             DATE_STORE_PREFIX,
             DUR_STORE_PREFIX,
+            EP_DUR_STORE_PREFIX,
             TAGS_STORE_PREFIX,
             GIF_STORE_PREFIX,
         ]:
@@ -2637,6 +2660,7 @@ def delete_entire_drama_in_db(drama_title):
             CODE_STORE_PREFIX,
             DATE_STORE_PREFIX,
             DUR_STORE_PREFIX,
+            EP_DUR_STORE_PREFIX,
             TAGS_STORE_PREFIX,
             GIF_STORE_PREFIX,
         ]:
@@ -3867,6 +3891,7 @@ def handle_interactive_flow(message):
                     ep_number=1,
                     channel_msg_id=video_msg_id,
                     category=state.get("category"),
+                    duration_seconds=state.get("video_duration", 0),
                 )
                 if ep_cov_bytes:
                     save_episode_cover_in_db(drama_title, 1, ep_cov_bytes)
@@ -3907,6 +3932,7 @@ def handle_interactive_flow(message):
                 ep_number=ep_number,
                 channel_msg_id=video_msg_id,
                 category=state.get("category"),
+                duration_seconds=state.get("video_duration", 0),
             )
             if ep_cov_bytes:
                 save_episode_cover_in_db(drama_title, ep_number, ep_cov_bytes)
@@ -4035,8 +4061,7 @@ def handle_interactive_flow(message):
 
             if message.content_type == "video" and getattr(message, "video", None):
                 vdur = int(message.video.duration or 0)
-                if vdur > 0 and get_drama_duration_from_db(drama_title) == 0:
-                    save_drama_duration_in_db(drama_title, vdur)
+                # Per-episode duration is saved with the episode record below.
 
             ep_frame_bytes = extract_single_frame_from_video_message(message)
 
@@ -4053,6 +4078,7 @@ def handle_interactive_flow(message):
                 ep_number=ep_number,
                 channel_msg_id=sent.message_id,
                 category=category,
+                duration_seconds=vdur if message.content_type == "video" and getattr(message, "video", None) else 0,
             )
 
             if ep_frame_bytes:
