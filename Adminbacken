@@ -2447,19 +2447,25 @@ def save_cover(drama_title, cover_file_id, channel_msg_id):
         "cover_file_id": "1",
         "cover_channel_msg_id": 0,
     }
-    clean_cover_result = (
-        supabase.table("drama_covers")
-        .select("drama_title")
-        .eq("drama_title", clean_cover_key)
-        .limit(1)
-        .execute()
-    )
-    if clean_cover_result.data:
-        supabase.table("drama_covers").update(clean_cover_payload).eq(
-            "drama_title", clean_cover_key
-        ).execute()
-    else:
-        supabase.table("drama_covers").insert(clean_cover_payload).execute()
+    try:
+        clean_cover_result = (
+            supabase.table("drama_covers")
+            .select("drama_title")
+            .eq("drama_title", clean_cover_key)
+            .limit(1)
+            .execute()
+        )
+        if clean_cover_result.data:
+            supabase.table("drama_covers").update(clean_cover_payload).eq(
+                "drama_title", clean_cover_key
+            ).execute()
+        else:
+            supabase.table("drama_covers").insert(clean_cover_payload).execute()
+    except Exception:
+        log.exception(
+            "Could not mark the newly uploaded cover as clean; legacy blur will remain enabled for %s",
+            drama_title,
+        )
 
     try:
         supabase.table("episodes").update({"cover_url": None}).eq("drama_title", drama_title).execute()
