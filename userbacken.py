@@ -3349,7 +3349,7 @@ def get_verified_telegram_user_id(request: Request) -> Optional[int]:
         if not received_hash or len(received_hash) != 64:
             return None
 
-        data_check_string = "\\n".join(
+        data_check_string = "\n".join(
             f"{key}={value}" for key, value in sorted(data.items())
         )
         secret_key = hmac.new(
