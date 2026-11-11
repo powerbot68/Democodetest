@@ -3600,7 +3600,7 @@ def list_dramas(user_id: Optional[int] = Query(default=None)):
     try:
         response = (
             supabase.table("episodes")
-            .select("drama_title,cover_url,category,channel_msg_id")
+            .select("drama_title,ep_number,cover_url,category,channel_msg_id")
             .order("channel_msg_id", desc=True)
             .execute()
         )
