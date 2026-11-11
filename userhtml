@@ -623,27 +623,6 @@
       pointer-events: none;
     }
 
-    /* Blur only the bottom-right area of legacy covers with burned-in duration text. */
-    .cover-wrap.cover-needs-blur::before,
-    .detail-cover-wrap.cover-needs-blur::before {
-      content: "";
-      position: absolute;
-      right: 0;
-      bottom: 0;
-      width: 52%;
-      height: 24%;
-      background: rgba(0, 0, 0, 0.10);
-      -webkit-backdrop-filter: blur(9px);
-      backdrop-filter: blur(9px);
-      pointer-events: none;
-      z-index: 4;
-    }
-
-    .cover-wrap.cover-needs-blur .cover-views,
-    .cover-wrap.cover-needs-blur .cover-play-icon {
-      z-index: 5;
-    }
-
 
     .spinner-ring {
       position: absolute;
@@ -3181,7 +3160,6 @@
 
     const coverWrap = document.createElement("div");
     coverWrap.className = "cover-wrap";
-    if (drama?.cover_blur_legacy) coverWrap.classList.add("cover-needs-blur");
 
     const spinner = document.createElement("div");
     spinner.className = "spinner-ring";
@@ -3232,7 +3210,7 @@
     statsLine.className = "card-stats-line";
     if (episodeCount > 0) {
       const episodeStat = document.createElement("span");
-      episodeStat.textContent = "▣ " + episodeCount + " ភាគ";
+      episodeStat.textContent = "▣ " + episodeCount + " Video";
       statsLine.appendChild(episodeStat);
     }
     if (durationText) {
@@ -3989,7 +3967,7 @@
     img.className = "ep-thumb";
     img.loading = "lazy";
     img.decoding = "async";
-    img.alt = `ភាគ ${epNum}`;
+    img.alt = `Video ${epNum}`;
     img.dataset.src = epCoverUrl;
     img.dataset.placeholder = placeholder;
 
@@ -4003,7 +3981,7 @@
     numBar.className = "ep-num-bar";
 
     const numTxt = document.createElement("span");
-    numTxt.textContent = `ភាគ ${epNum}`;
+    numTxt.textContent = `Video ${epNum}`;
     numBar.appendChild(numTxt);
 
     if (lastEp && epNum === lastEp) {
@@ -4045,7 +4023,6 @@
     }
 
     detailTitle.textContent = titleText;
-    detailCoverWrap.classList.toggle("cover-needs-blur", Boolean(drama?.cover_blur_legacy));
     updateDetailCodeAndDateBadges(initialCode, initialDate, initialCat, initialDuration);
 
     resetDetailGifPreview();
@@ -4093,7 +4070,7 @@
       }
     });
 
-    detailSub.textContent = "កំពុងផ្ទុកភាគ...";
+    detailSub.textContent = "កំពុងផ្ទុក Video...";
     epCount.textContent = "";
     continueBtn.innerHTML = `<span class="btn-mini-spinner"></span><span>កំពុងផ្ទុក...</span>`;
     continueBtn.classList.remove("hidden");
@@ -4128,7 +4105,6 @@
         adminStatsBtn?.classList.remove("hidden");
       }
 
-      detailCoverWrap.classList.toggle("cover-needs-blur", Boolean(data.cover_blur_legacy));
       const episodes = Array.isArray(data.episodes) ? data.episodes : [];
       const lastEp = data.last_ep ? Number(data.last_ep) : null;
 
@@ -4171,8 +4147,8 @@
       episodesContainer.replaceChildren();
 
       if (!episodes.length) {
-        detailSub.textContent = "មិនទាន់មានភាគទេ";
-        continueBtn.innerHTML = `<span>មិនទាន់មានភាគ</span>`;
+        detailSub.textContent = "មិនទាន់មាន Video ទេ";
+        continueBtn.innerHTML = `<span>មិនទាន់មាន Video</span>`;
         continueBtn.disabled = true;
         episodesSection.classList.add("hidden");
         return;
@@ -4189,12 +4165,12 @@
         episodesSection.classList.add("hidden");
       } else {
         episodesSection.classList.remove("hidden");
-        epCount.textContent = `${episodes.length} ភាគ`;
+        epCount.textContent = `${episodes.length} Video`;
         detailSub.textContent = lastEp
-          ? `ធ្លាប់មើលដល់ ភាគ ${lastEp} • សរុប ${episodes.length} ភាគ`
-          : `សរុប ${episodes.length} ភាគ`;
+          ? `ធ្លាប់មើលដល់ Video ${lastEp} • សរុប ${episodes.length} Video`
+          : `សរុប ${episodes.length} Video`;
 
-        const labelText = lastEp ? `បន្តភាគ ${lastEp}` : `មើលភាគ ${targetEp}`;
+        const labelText = lastEp ? `បន្ត Video ${lastEp}` : `មើល Video ${targetEp}`;
         continueBtn.innerHTML = `${PLAY_LINE_ICON}<span>${labelText}</span>`;
         continueBtn.disabled = false;
         continueBtn.onclick = () => playEpisodeInBot(titleText, targetEp, continueBtn);
