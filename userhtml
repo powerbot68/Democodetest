@@ -764,6 +764,24 @@
 
     .card-body { padding: 7px 7px 8px; }
 
+    .card-stats-line {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 7px;
+      margin-top: 4px;
+      color: var(--muted, #9ca3af);
+      font-size: 9px;
+      line-height: 1.35;
+      font-weight: 500;
+    }
+
+    .card-stats-line span {
+      display: inline-flex;
+      align-items: center;
+      white-space: nowrap;
+    }
+
     .card-title {
       font-family: "Koh Santepheap", "Kantumruy Pro", serif;
       font-size: 12px;
@@ -3123,6 +3141,7 @@
     const codeText = getDramaCode(drama);
     const dateText = getUploadDate(drama);
     const durationText = getDurationText(drama);
+    const episodeCount = Math.max(0, Number(drama?.episode_count || 0));
     const placeholder = makePlaceholder();
     const coverUrl = getCover(drama);
     const viewsText = getViewsCount(drama);
@@ -3158,13 +3177,6 @@
 
     coverWrap.append(spinner, img, playOverlay, viewsBadge);
 
-    if (durationText) {
-      const durBadge = document.createElement("div");
-      durBadge.className = "cover-duration";
-      durBadge.textContent = durationText;
-      coverWrap.appendChild(durBadge);
-    }
-
     const body = document.createElement("div");
     body.className = "card-body";
 
@@ -3185,7 +3197,22 @@
     dateSpan.textContent = dateText || normalizeCategory(drama.category) || "";
 
     meta.append(codeSpan, dateSpan);
+
+    const statsLine = document.createElement("div");
+    statsLine.className = "card-stats-line";
+    if (episodeCount > 0) {
+      const episodeStat = document.createElement("span");
+      episodeStat.textContent = "▣ " + episodeCount + " ភាគ";
+      statsLine.appendChild(episodeStat);
+    }
+    if (durationText) {
+      const durationStat = document.createElement("span");
+      durationStat.textContent = "⏱ " + durationText;
+      statsLine.appendChild(durationStat);
+    }
+
     body.append(title, meta);
+    if (statsLine.childElementCount > 0) body.appendChild(statsLine);
     card.append(coverWrap, body);
 
     card.addEventListener("click", (e) => {
