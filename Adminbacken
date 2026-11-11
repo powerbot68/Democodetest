@@ -2529,7 +2529,7 @@ def update_drama_title_in_db(old_title, new_title):
 def update_episode_number_in_db(drama_title, old_ep, new_ep):
     existing_old = find_episode(drama_title, old_ep)
     if not existing_old:
-        return False, f"❌ រកមិនឃើញភាគទី {old_ep} ក្នុងរឿង «{drama_title}» ទេ."
+        return False, f"❌ រកមិនឃើញភាគទី {old_ep} ក្នុងរឿង «{drama_title}» ទេ។"
 
     if int(old_ep) == int(new_ep):
         return True, f"ℹ️ លេខភាគនៅតែជា {old_ep} ដដែល មិនមានអ្វីត្រូវកែទេ។"
