@@ -70,6 +70,7 @@ GIF_STORE_PREFIX = "__GIF__"
 ALBUM_STORE_PREFIX = "__ALBUM__"
 EP_COV_STORE_PREFIX = "__EPCOV__"
 EP_DUR_STORE_PREFIX = "__EPDUR__"
+CLEAN_COVER_PREFIX = "__COVER_CLEAN__"
 
 REQ_LIMIT_KEY = "__REQ_LIMIT__"
 USER_START_KEY = "__USER_START__"
@@ -326,6 +327,7 @@ def is_internal_key(title: str) -> bool:
         or t.startswith(ALBUM_STORE_PREFIX)
         or t.startswith(EP_COV_STORE_PREFIX)
         or t.startswith(EP_DUR_STORE_PREFIX)
+        or t.startswith(CLEAN_COVER_PREFIX)
         or t.startswith("__CFG__")
         or t.startswith(NOTIF_WATCH_PREFIX)
         or t.startswith("__REQ")
@@ -1581,6 +1583,7 @@ def fetch_all_drama_metadata_maps() -> dict:
     upload_dates = {}
     durations = {}
     episode_durations = {}
+    clean_covers = set()
     tags_map = {}
     gifs_map = {}
     categories = set()
@@ -1620,6 +1623,11 @@ def fetch_all_drama_metadata_maps() -> dict:
                             top_trending_titles = [str(x).strip() for x in parsed_tr if str(x).strip()]
                     except Exception:
                         pass
+                continue
+            if t.startswith(CLEAN_COVER_PREFIX):
+                real_title = t[len(CLEAN_COVER_PREFIX):].strip()
+                if real_title and str(r.get("cover_file_id") or "").strip() == "1":
+                    clean_covers.add(real_title)
                 continue
             if t.startswith(CAT_STORE_PREFIX):
                 c_name = t[len(CAT_STORE_PREFIX):].strip()
@@ -1706,6 +1714,7 @@ def fetch_all_drama_metadata_maps() -> dict:
         "upload_dates": upload_dates,
         "durations": durations,
         "episode_durations": episode_durations,
+        "clean_covers": clean_covers,
         "tags": tags_map,
         "gifs": gifs_map,
         "categories": categories,
@@ -1769,6 +1778,7 @@ def fetch_single_drama_metadata(drama_title: str) -> dict:
     has_gif = False
     gif_version = "v1"
     main_cover_version = "v1"
+    cover_is_clean = False
     album_items = []
     is_trending = False
 
@@ -1779,6 +1789,7 @@ def fetch_single_drama_metadata(drama_title: str) -> dict:
             f"{CODE_STORE_PREFIX}{drama_title}",
             f"{DATE_STORE_PREFIX}{drama_title}",
             f"{DUR_STORE_PREFIX}{drama_title}",
+            f"{CLEAN_COVER_PREFIX}{drama_title}",
             f"{TAGS_STORE_PREFIX}{drama_title}",
             f"{GIF_STORE_PREFIX}{drama_title}",
             f"{ALBUM_STORE_PREFIX}{drama_title}__1",
@@ -1797,7 +1808,9 @@ def fetch_single_drama_metadata(drama_title: str) -> dict:
             k = (r.get("drama_title") or "").strip()
             val = (r.get("cover_file_id") or "").strip()
             mid = r.get("cover_channel_msg_id") or ""
-            if k == f"{SYN_STORE_PREFIX}{drama_title}":
+            if k == f"{CLEAN_COVER_PREFIX}{drama_title}":
+                cover_is_clean = val == "1"
+            elif k == f"{SYN_STORE_PREFIX}{drama_title}":
                 synopsis = val
             elif k == f"{CODE_STORE_PREFIX}{drama_title}" and val.upper().startswith("XF-"):
                 drama_code = val.upper()
@@ -1850,6 +1863,7 @@ def fetch_single_drama_metadata(drama_title: str) -> dict:
         "has_gif": has_gif,
         "gif_version": gif_version,
         "cover_version": main_cover_version,
+        "cover_is_clean": cover_is_clean,
         "album": album_items,
         "is_trending": is_trending,
     }
@@ -3736,6 +3750,7 @@ def list_dramas(request: Request, user_id: Optional[int] = Query(default=None)):
         upload_dates_map = meta["upload_dates"]
         durations_map = meta["durations"]
         episode_durations_map = meta.get("episode_durations", {})
+        clean_covers = meta.get("clean_covers", set())
         tags_map = meta["tags"]
         gifs_map = meta["gifs"]
         extra_cats = meta["categories"]
@@ -3773,6 +3788,7 @@ def list_dramas(request: Request, user_id: Optional[int] = Query(default=None)):
                     "title": title,
                     "cover_url": raw_cover_url,
                     "cover_version": ver,
+                    "cover_blur_legacy": title not in clean_covers,
                     "category": cat,
                     "audio_type": audio_type,
                     "views": views_map.get(title, 0),
@@ -3989,6 +4005,7 @@ def list_drama_episodes(
             "duration_seconds": total_episode_duration,
             "duration_text": format_video_duration(total_episode_duration) if total_episode_duration > 0 else "",
             "episode_count": episode_count,
+            "cover_blur_legacy": not bool(single_meta.get("cover_is_clean")),
             "has_gif": single_meta["has_gif"],
             "gif_version": single_meta["gif_version"],
             "tags": single_meta["tags"],
@@ -4256,6 +4273,7 @@ def get_user_favorites_api(user_id: int, request: Request):
         upload_dates_map = meta["upload_dates"]
         durations_map = meta["durations"]
         episode_durations_map = meta.get("episode_durations", {})
+        clean_covers = meta.get("clean_covers", set())
         tags_map = meta["tags"]
         gifs_map = meta["gifs"]
         views_map = fetch_drama_views_map()
@@ -4302,6 +4320,7 @@ def get_user_favorites_api(user_id: int, request: Request):
                 "gif_version": gif_ver or "v1",
                 "cover_url": raw_cover,
                 "cover_version": ver,
+                "cover_blur_legacy": title not in clean_covers,
                 "category": cat_str,
                 "audio_type": audio_type,
                 "views": views_map.get(title, 0),
@@ -4848,6 +4867,7 @@ def get_user_history_api(user_id: int, request: Request):
         upload_dates_map = meta["upload_dates"]
         durations_map = meta["durations"]
         episode_durations_map = meta.get("episode_durations", {})
+        clean_covers = meta.get("clean_covers", set())
         tags_map = meta["tags"]
         gifs_map = meta["gifs"]
         views_map = fetch_drama_views_map()
@@ -4892,6 +4912,7 @@ def get_user_history_api(user_id: int, request: Request):
                 "last_ep": row.get("last_ep"),
                 "cover_url": raw_cover,
                 "cover_version": ver,
+                "cover_blur_legacy": title not in clean_covers,
                 "category": cat_str,
                 "audio_type": audio_type,
                 "views": views_map.get(title, 0),
