@@ -3947,8 +3947,17 @@
   async function playEpisodeInBot(titleText, epNumber, clickedButton, isRetryAfterModal = false) {
     savePersistedState();
     const tg = window.Telegram?.WebApp;
+    const signedInitData = String(tg?.initData || "").trim();
     const userId = getUserId();
-    if (userId) {
+
+    // A numeric ID from initDataUnsafe or the URL is not proof of Telegram identity.
+    // Require Telegram's signed initData before calling the authenticated API.
+    if (userId && !signedInitData) {
+      alert("មិនអាចផ្ទៀងផ្ទាត់គណនី Telegram បានទេ។ សូមបិទ Mini App ហើយបើកវាឡើងវិញពីក្នុង Telegram Bot។");
+      return;
+    }
+
+    if (userId && signedInitData) {
       const originalHTML = clickedButton ? clickedButton.innerHTML : "";
       try {
         if (clickedButton && !isRetryAfterModal) {
@@ -3956,27 +3965,33 @@
         }
         const res = await fetch(`${API_BASE}/api/select-drama`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "X-Telegram-Init-Data": signedInitData
+          },
           body: JSON.stringify({ user_id: userId, title: titleText, ep_number: epNumber })
         });
-        if (res.status === 403) {
-          const data = await res.json().catch(() => ({}));
-          if (data.status === "join_required") {
-            if (clickedButton) {
-              clickedButton.innerHTML = originalHTML;
-              clickedButton.disabled = false;
-            }
-            showChannelJoinModal(
-              data.channel_link || "https://t.me/xfanster",
-              titleText,
-              epNumber,
-              clickedButton,
-              Boolean(isRetryAfterModal)
-            );
-            return;
+        const data = await res.json().catch(() => ({}));
+        if (res.status === 403 && data.status === "join_required") {
+          if (clickedButton) {
+            clickedButton.innerHTML = originalHTML;
+            clickedButton.disabled = false;
           }
+          showChannelJoinModal(
+            data.channel_link || "https://t.me/xfanster",
+            titleText,
+            epNumber,
+            clickedButton,
+            Boolean(isRetryAfterModal)
+          );
+          return;
         }
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (!res.ok) {
+          const detail = String(data.detail || data.message || "").trim();
+          const error = new Error(`HTTP ${res.status}${detail ? `: ${detail}` : ""}`);
+          error.status = res.status;
+          throw error;
+        }
         const existingModal = document.getElementById("xfansterChannelJoinModal");
         if (existingModal) existingModal.remove();
         tg?.close();
@@ -3986,7 +4001,13 @@
           clickedButton.innerHTML = originalHTML;
           clickedButton.disabled = false;
         }
-        alert("មិនអាចបើកភាគនេះបានទេ សូមព្យាយាមម្ដងទៀត។");
+        if (error?.status === 401) {
+          alert("ការផ្ទៀងផ្ទាត់ Telegram ផុតកំណត់ ឬមិនត្រឹមត្រូវ។ សូមបិទ Mini App ហើយបើកឡើងវិញពីក្នុង Telegram Bot។");
+        } else if (error?.status >= 500) {
+          alert("Server កំពុងមានបញ្ហា។ សូមសាកល្បងម្ដងទៀតនៅពេលក្រោយ។");
+        } else {
+          alert("មិនអាចបើកភាគនេះបានទេ។ " + (error?.message || "សូមព្យាយាមម្ដងទៀត។"));
+        }
       }
     } else if (tg) {
       try {
