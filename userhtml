@@ -4135,7 +4135,7 @@
     numBar.className = "ep-num-bar";
 
     const numTxt = document.createElement("span");
-    numTxt.textContent = `Video ${epNum}`;
+    numTxt.textContent = `ភាគ ${epNum}`;
     numBar.appendChild(numTxt);
 
     if (lastEp && epNum === lastEp) {
@@ -4325,12 +4325,12 @@
         episodesSection.classList.add("hidden");
       } else {
         episodesSection.classList.remove("hidden");
-        epCount.textContent = `${episodes.length} Video`;
+        epCount.textContent = `${episodes.length} ភាគ`;
         detailSub.textContent = lastEp
-          ? `ធ្លាប់មើលដល់ Video ${lastEp} • សរុប ${episodes.length} Video`
-          : `សរុប ${episodes.length} Video`;
+          ? `ធ្លាប់មើលដល់ភាគ ${lastEp} • សរុប ${episodes.length} ភាគ`
+          : `សរុប ${episodes.length} ភាគ`;
 
-        const labelText = lastEp ? `បន្ត Video ${lastEp}` : `មើល Video ${targetEp}`;
+        const labelText = lastEp ? `បន្តភាគ ${lastEp}` : `មើលភាគ ${targetEp}`;
         continueBtn.innerHTML = `${PLAY_LINE_ICON}<span>${labelText}</span>`;
         continueBtn.disabled = false;
         continueBtn.onclick = () => playEpisodeInBot(titleText, targetEp, continueBtn);
@@ -4542,9 +4542,13 @@
     sectionTitle.textContent = "រឿងធ្លាប់មើល";
 
     try {
+      const historyInitData = String(window.Telegram?.WebApp?.initData || "").trim();
       const response = await fetch(`${API_BASE}/api/history/${userId}?_t=${Date.now()}`, {
         method: "GET",
-        headers: { "Accept": "application/json" },
+        headers: {
+          "Accept": "application/json",
+          ...(historyInitData ? { "X-Telegram-Init-Data": historyInitData } : {})
+        },
         cache: "no-store"
       });
       if (!response.ok) throw new Error(`API HTTP ${response.status}`);
