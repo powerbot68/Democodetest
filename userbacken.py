@@ -319,6 +319,7 @@ def is_internal_key(title: str) -> bool:
         or t.startswith(GIF_STORE_PREFIX)
         or t.startswith(ALBUM_STORE_PREFIX)
         or t.startswith(EP_COV_STORE_PREFIX)
+        or t.startswith(EP_DUR_STORE_PREFIX)
         or t.startswith("__CFG__")
         or t.startswith(NOTIF_WATCH_PREFIX)
         or t.startswith("__REQ")
