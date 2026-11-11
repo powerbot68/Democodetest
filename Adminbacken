@@ -134,6 +134,7 @@ def _parse_int_safely(raw_val: str, name: str) -> int:
 required_settings = {
     "ADMIN_BOT_TOKEN (or BOT_TOKEN)": BOT_TOKEN,
     "ADMIN_ID": ADMIN_ID,
+    "INTERNAL_API_SECRET": INTERNAL_API_SECRET,
     "CHANNEL_ID (or SOURCE_CHANNEL_ID)": CHANNEL_ID,
     "SUPABASE_URL": SUPABASE_URL,
     "SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_KEY)": SUPABASE_KEY,
