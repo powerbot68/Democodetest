@@ -1669,17 +1669,25 @@ def broadcast_new_drama_notification_async(
                 except Exception:
                     cover_bytes = None
 
+            if not drama_code:
+                log.error("Cannot send new-drama notification without a real drama code: %s", drama_title)
+                try:
+                    bot.send_message(admin_chat_id, f"⚠️ មិនអាចផ្ញើ Notification បានទេ ព្រោះរកមិនឃើញកូដពិតរបស់រឿង «{html.escape(drama_title)}»។")
+                except Exception:
+                    pass
+                return
+
             # ប៊ូតុងនេះប្រើសម្រាប់ចម្លងកូដរឿងប៉ុណ្ណោះ មិនមានប៊ូតុងមើលរឿងទេ។
             copy_markup = InlineKeyboardMarkup()
             copy_markup.add(
                 InlineKeyboardButton(
                     "📋 ចម្លងកូដ",
-                    copy_text=CopyTextButton(text=drama_code or "XF-000001"),
+                    copy_text=CopyTextButton(text=drama_code),
                 )
             )
 
             escaped_title = html.escape(drama_title)
-            escaped_code = html.escape(drama_code or "XF-000001")
+            escaped_code = html.escape(drama_code)
             caption_text = (
                 f"🔥 <b>រឿងថ្មីទើបមកដល់ក្នុង {CHANNEL_DISPLAY_NAME}!</b>\n"
                 f"<b>{escaped_title}</b>\n"
@@ -2536,7 +2544,25 @@ def update_episode_number_in_db(drama_title, old_ep, new_ep):
             {"drama_title": f"{EP_COV_STORE_PREFIX}{drama_title}__{new_ep}"}
         ).eq("drama_title", f"{EP_COV_STORE_PREFIX}{drama_title}__{old_ep}").execute()
     except Exception:
-        pass
+        log.exception("Could not move episode cover metadata from %s to %s", old_ep, new_ep)
+
+    # Keep the duration attached to the episode when its number changes.
+    old_duration_key = f"{EP_DUR_STORE_PREFIX}{drama_title}__{int(old_ep)}"
+    new_duration_key = f"{EP_DUR_STORE_PREFIX}{drama_title}__{int(new_ep)}"
+    try:
+        duration_row = (
+            supabase.table("drama_covers")
+            .select("cover_file_id")
+            .eq("drama_title", old_duration_key)
+            .limit(1)
+            .execute()
+        )
+        if duration_row.data:
+            supabase.table("drama_covers").update(
+                {"drama_title": new_duration_key}
+            ).eq("drama_title", old_duration_key).execute()
+    except Exception:
+        log.exception("Could not move episode duration metadata from %s to %s", old_ep, new_ep)
 
     ch_msg_id = existing_old.get("channel_msg_id")
     if ch_msg_id:
@@ -2716,7 +2742,13 @@ def delete_single_episode_in_db(drama_title, ep_number):
                 safe_delete_message(CHANNEL_ID_VALUE, int(ec_mid))
             supabase.table("drama_covers").delete().eq("drama_title", ep_cov_key).execute()
     except Exception:
-        pass
+        log.exception("Could not remove episode cover metadata for %s episode %s", drama_title, ep_number)
+
+    try:
+        ep_duration_key = f"{EP_DUR_STORE_PREFIX}{drama_title}__{int(ep_number)}"
+        supabase.table("drama_covers").delete().eq("drama_title", ep_duration_key).execute()
+    except Exception:
+        log.exception("Could not remove episode duration metadata for %s episode %s", drama_title, ep_number)
 
     (
         supabase.table("episodes")
@@ -2753,47 +2785,13 @@ def format_video_duration(seconds):
 
 
 def create_duration_cover_from_bytes(photo_bytes: bytes, duration_seconds: int, drama_title: str):
+    # Keep the uploaded/selected cover clean: duration is shown below the title in the Mini App,
+    # never burned into the cover image. Keep the legacy function signature for callers.
     with Image.open(io.BytesIO(photo_bytes)) as source:
         image = source.convert("RGB")
 
-    if int(duration_seconds or 0) > 0:
-        overlay = Image.new("RGBA", image.size, (0, 0, 0, 0))
-        draw = ImageDraw.Draw(overlay)
-        duration_text = format_video_duration(duration_seconds)
-        font_size = max(18, int(image.width * 0.045))
-
-        try:
-            font = ImageFont.truetype("DejaVuSans-Bold.ttf", font_size)
-        except OSError:
-            font = ImageFont.load_default()
-
-        bbox = draw.textbbox((0, 0), duration_text, font=font)
-        text_width = bbox[2] - bbox[0]
-        text_height = bbox[3] - bbox[1]
-        pad_x = max(10, int(image.width * 0.018))
-        pad_y = max(6, int(image.width * 0.012))
-        margin = max(12, int(image.width * 0.025))
-
-        x2 = image.width - margin
-        y2 = image.height - margin
-        x1 = x2 - text_width - pad_x * 2
-        y1 = y2 - text_height - pad_y * 2
-
-        draw.rounded_rectangle(
-            (x1, y1, x2, y2),
-            radius=max(7, int(font_size * 0.22)),
-            fill=(0, 0, 0, 220),
-        )
-        draw.text(
-            (x1 + pad_x, y1 + pad_y - bbox[1]),
-            duration_text,
-            font=font,
-            fill=(255, 255, 255, 255),
-        )
-        image = Image.alpha_composite(image.convert("RGBA"), overlay).convert("RGB")
-
     output = io.BytesIO()
-    output.name = "duration_cover.jpg"
+    output.name = "cover.jpg"
     image.save(output, format="JPEG", quality=92, optimize=True)
     output.seek(0)
 
