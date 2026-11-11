@@ -4243,9 +4243,15 @@
       const queryParam = userId ? `?user_id=${encodeURIComponent(userId)}&_t=${Date.now()}` : `?_t=${Date.now()}`;
       const url = `${API_BASE}/api/dramas/${encodeURIComponent(titleText)}/episodes${queryParam}`;
 
+      const telegramInitData = String(window.Telegram?.WebApp?.initData || "").trim();
+      const episodeRequestHeaders = { "Accept": "application/json" };
+      if (telegramInitData) {
+        episodeRequestHeaders["X-Telegram-Init-Data"] = telegramInitData;
+      }
+
       const res = await fetch(url, {
         method: "GET",
-        headers: { "Accept": "application/json" },
+        headers: episodeRequestHeaders,
         cache: "no-store"
       });
 
