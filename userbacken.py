@@ -3867,9 +3867,16 @@ def list_dramas(request: Request, user_id: Optional[int] = Query(default=None)):
 @app.get("/api/dramas/{drama_title}/episodes")
 def list_drama_episodes(
     drama_title: str,
+    request: Request,
     user_id: Optional[int] = Query(default=None),
 ):
     try:
+        verified_user_id = get_verified_telegram_user_id(request)
+        effective_user_id = (
+            verified_user_id
+            if verified_user_id and (user_id is None or int(user_id) == verified_user_id)
+            else None
+        )
         response = (
             supabase.table("episodes")
             .select("ep_number,cover_url,channel_msg_id")
@@ -3882,13 +3889,13 @@ def list_drama_episodes(
         is_fav = False
         can_request_today = True
 
-        if user_id is not None:
-            record_user_start(user_id)
+        if effective_user_id is not None:
+            record_user_start(effective_user_id)
             try:
                 hist = (
                     supabase.table("user_history")
                     .select("last_ep")
-                    .eq("user_id", user_id)
+                    .eq("user_id", effective_user_id)
                     .eq("drama_title", drama_title)
                     .limit(1)
                     .execute()
@@ -3898,12 +3905,12 @@ def list_drama_episodes(
             except Exception:
                 log.warning("Could not query user_history for detail page")
 
-            is_fav = check_user_favorite(user_id, drama_title)
-            can_request_today = not has_user_requested_today(user_id)
+            is_fav = check_user_favorite(effective_user_id, drama_title)
+            can_request_today = not has_user_requested_today(effective_user_id)
 
         single_meta = fetch_single_drama_metadata(drama_title)
         ep_cov_versions = fetch_episode_cover_versions_map(drama_title)
-        avg_rating, rating_count, user_rating = fetch_drama_rating_stats(drama_title, user_id)
+        avg_rating, rating_count, user_rating = fetch_drama_rating_stats(drama_title, effective_user_id)
         views_count = 0
         likes_count = 0
         try:
@@ -3998,7 +4005,7 @@ def list_drama_episodes(
             "user_rating": user_rating,
             "can_request_today": can_request_today,
             "cambodia_date": get_cambodia_date_str(),
-            "is_admin": is_admin_user(user_id) if user_id else False,
+            "is_admin": is_admin_user(verified_user_id) if verified_user_id else False,
         }
 
     except Exception:
