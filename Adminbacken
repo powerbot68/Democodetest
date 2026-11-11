@@ -2558,9 +2558,23 @@ def update_episode_number_in_db(drama_title, old_ep, new_ep):
             .execute()
         )
         if duration_row.data:
-            supabase.table("drama_covers").update(
-                {"drama_title": new_duration_key}
-            ).eq("drama_title", old_duration_key).execute()
+            old_seconds = str(duration_row.data[0].get("cover_file_id") or "")
+            new_row = (
+                supabase.table("drama_covers")
+                .select("drama_title")
+                .eq("drama_title", new_duration_key)
+                .limit(1)
+                .execute()
+            )
+            if new_row.data:
+                supabase.table("drama_covers").update(
+                    {"cover_file_id": old_seconds}
+                ).eq("drama_title", new_duration_key).execute()
+                supabase.table("drama_covers").delete().eq("drama_title", old_duration_key).execute()
+            else:
+                supabase.table("drama_covers").update(
+                    {"drama_title": new_duration_key}
+                ).eq("drama_title", old_duration_key).execute()
     except Exception:
         log.exception("Could not move episode duration metadata from %s to %s", old_ep, new_ep)
 
