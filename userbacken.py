@@ -32,7 +32,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 import telebot
 from telebot.types import (
@@ -3244,7 +3244,17 @@ app.add_middleware(
 
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
-    response = await call_next(request)
+    content_length = request.headers.get("content-length", "")
+    try:
+        if content_length and int(content_length) > 15 * 1024 * 1024:
+            response = JSONResponse(
+                status_code=413,
+                content={"detail": "Request body is too large"},
+            )
+        else:
+            response = await call_next(request)
+    except ValueError:
+        response = JSONResponse(status_code=400, content={"detail": "Invalid Content-Length"})
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
     response.headers.setdefault(
@@ -3260,66 +3270,66 @@ async def add_security_headers(request: Request, call_next):
 
 class SelectDramaRequest(BaseModel):
     user_id: int
-    title: str
-    ep_number: int = 1
+    title: str = Field(..., min_length=1, max_length=200)
+    ep_number: int = Field(default=1, ge=1, le=10000)
 
 
 class FavoriteDramaRequest(BaseModel):
     user_id: int
-    title: str
+    title: str = Field(..., min_length=1, max_length=200)
     is_favorite: bool = True
 
 
 class RateDramaRequest(BaseModel):
     user_id: int = 0
-    title: str
+    title: str = Field(..., min_length=1, max_length=200)
     stars: int
 
 
 class UserFeedbackRequest(BaseModel):
     user_id: Optional[int] = None
-    first_name: Optional[str] = ""
-    last_name: Optional[str] = ""
-    username: Optional[str] = ""
-    drama_title: Optional[str] = ""
-    message: str
+    first_name: Optional[str] = Field(default="", max_length=64)
+    last_name: Optional[str] = Field(default="", max_length=64)
+    username: Optional[str] = Field(default="", max_length=64)
+    drama_title: Optional[str] = Field(default="", max_length=200)
+    message: str = Field(..., min_length=1, max_length=2000)
 
 
 class InternalBroadcastRequest(BaseModel):
-    drama_title: str
+    drama_title: str = Field(..., min_length=1, max_length=200)
     admin_chat_id: Optional[int] = None
     custom_cover_msg_id: Optional[int] = None
-    custom_cover_file_id: Optional[str] = None
+    custom_cover_file_id: Optional[str] = Field(default=None, max_length=1024)
 
 
 class InternalChannelConfigRequest(BaseModel):
     channel_id: Optional[int] = None
-    channel_link: Optional[str] = None
+    channel_link: Optional[str] = Field(default=None, max_length=2048)
 
 
 class AdminToggleTrendingRequest(BaseModel):
     user_id: int
-    title: str
+    title: str = Field(..., min_length=1, max_length=200)
     is_trending: bool
 
 
 class AdminUploadEpCoverRequest(BaseModel):
     user_id: int
-    title: str
-    ep_number: int
-    image_base64: str
+    title: str = Field(..., min_length=1, max_length=200)
+    ep_number: int = Field(..., ge=1, le=10000)
+    image_base64: str = Field(..., min_length=1, max_length=12 * 1024 * 1024)
 
 
 class AdminUploadAlbumRequest(BaseModel):
     user_id: int
-    title: str
-    slot: int
-    image_base64: str
+    title: str = Field(..., min_length=1, max_length=200)
+    slot: int = Field(..., ge=1, le=3)
+    image_base64: str = Field(..., min_length=1, max_length=12 * 1024 * 1024)
 
 
 class AdminDeleteAlbumRequest(BaseModel):
     user_id: int
-    title: str
+    title: str = Field(..., min_length=1, max_length=200)
     slot: Optional[int] = None
 
 
