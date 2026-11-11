@@ -3389,6 +3389,17 @@ def require_admin_request(
     return verified_user_id
 
 
+def require_authenticated_telegram_user(
+    request: Request, claimed_user_id: Optional[int] = None
+) -> int:
+    verified_user_id = get_verified_telegram_user_id(request)
+    if not verified_user_id:
+        raise HTTPException(status_code=401, detail="Valid Telegram Mini App authentication required")
+    if claimed_user_id is not None and int(claimed_user_id) != verified_user_id:
+        raise HTTPException(status_code=403, detail="User identity mismatch")
+    return verified_user_id
+
+
 def require_internal_api_key(request: Request) -> None:
     supplied = request.headers.get("X-Internal-API-Key", "")
     if not INTERNAL_API_SECRET:
@@ -3430,10 +3441,6 @@ def get_admin_analytics_api(request: Request, user_id: Optional[int] = Query(def
         require_admin_request(request, user_id)
     except HTTPException as exc:
         return JSONResponse(status_code=exc.status_code, content={"is_admin": False, "detail": exc.detail})
-        return JSONResponse(
-            status_code=403,
-            content={"is_admin": False, "detail": "Forbidden: Admin access only"},
-        )
 
     stats = compute_user_analytics_payload()
     stats["is_admin"] = True
@@ -3648,9 +3655,10 @@ def admin_delete_album_photo_api(req: AdminDeleteAlbumRequest, request: Request)
 
 
 @app.get("/api/dramas")
-def list_dramas(user_id: Optional[int] = Query(default=None)):
-    if user_id:
-        record_user_start(user_id)
+def list_dramas(request: Request, user_id: Optional[int] = Query(default=None)):
+    verified_user_id = get_verified_telegram_user_id(request)
+    if user_id and verified_user_id and int(user_id) == verified_user_id:
+        record_user_start(verified_user_id)
 
     now = time.time()
     with dramas_cache_lock:
@@ -3961,10 +3969,11 @@ def list_drama_episodes(
 
 
 @app.post("/api/rate")
-def rate_drama_api(req: RateDramaRequest):
+def rate_drama_api(req: RateDramaRequest, request: Request):
     try:
+        verified_user_id = require_authenticated_telegram_user(request, req.user_id or None)
         stars = max(1, min(5, int(req.stars)))
-        uid = int(req.user_id) if req.user_id else int(time.time() % 100000000)
+        uid = verified_user_id
         rate_key = f"{RATE_STORE_PREFIX}{req.title}"
 
         supabase.table("user_history").upsert(
@@ -3993,13 +4002,15 @@ def rate_drama_api(req: RateDramaRequest):
 
 
 @app.post("/api/user-request")
-def submit_user_request_api(req: UserFeedbackRequest):
+def submit_user_request_api(req: UserFeedbackRequest, request: Request):
     try:
+        verified_user_id = require_authenticated_telegram_user(request, req.user_id)
+
         clean_msg = (req.message or "").strip()
         if not clean_msg:
             return JSONResponse(status_code=400, content={"detail": "Empty message"})
 
-        uid = req.user_id
+        uid = verified_user_id
 
         if uid and has_user_requested_today(uid):
             return JSONResponse(
@@ -4113,8 +4124,9 @@ def submit_user_request_api(req: UserFeedbackRequest):
 
 
 @app.post("/api/favorite")
-def toggle_favorite_api(req: FavoriteDramaRequest):
+def toggle_favorite_api(req: FavoriteDramaRequest, request: Request):
     try:
+        require_authenticated_telegram_user(request, req.user_id)
         fav_key = f"{FAV_STORE_PREFIX}{req.title}"
         if req.is_favorite:
             supabase.table("user_history").upsert(
@@ -4143,8 +4155,9 @@ def toggle_favorite_api(req: FavoriteDramaRequest):
 
 
 @app.get("/api/favorites/{user_id}")
-def get_user_favorites_api(user_id: int):
+def get_user_favorites_api(user_id: int, request: Request):
     try:
+        require_authenticated_telegram_user(request, user_id)
         fav_res = (
             supabase.table("user_history")
             .select("drama_title")
@@ -4259,8 +4272,9 @@ def get_user_favorites_api(user_id: int):
 
 
 @app.post("/api/select-drama")
-def select_drama_api(req: SelectDramaRequest):
+def select_drama_api(req: SelectDramaRequest, request: Request):
     try:
+        require_authenticated_telegram_user(request, req.user_id)
         uid = int(req.user_id)
         if not is_required_channel_member(uid):
             PENDING_WATCH_AFTER_JOIN[uid] = {
@@ -4730,8 +4744,9 @@ def get_drama_cover(
 
 
 @app.get("/api/history/{user_id}")
-def get_user_history_api(user_id: int):
+def get_user_history_api(user_id: int, request: Request):
     try:
+        require_authenticated_telegram_user(request, user_id)
         hist_res = (
             supabase.table("user_history")
             .select("drama_title, last_ep")
