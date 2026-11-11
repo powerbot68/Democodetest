@@ -3516,7 +3516,7 @@ def admin_toggle_trending_api(req: AdminToggleTrendingRequest, request: Request)
         }
     except Exception as exc:
         log.exception("Failed to toggle top trending")
-        return JSONResponse(status_code=500, content={"detail": str(exc)})
+        return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 
 @app.post("/api/admin/upload-ep-cover")
@@ -4016,7 +4016,7 @@ def rate_drama_api(req: RateDramaRequest, request: Request):
         log.exception("Rate drama API failed")
         return JSONResponse(
             status_code=500,
-            content={"detail": str(exc)},
+            content={"detail": "Internal server error"},
         )
 
 
