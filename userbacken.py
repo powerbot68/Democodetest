@@ -3293,8 +3293,20 @@ def decode_base64_image_bytes(raw_b64: str) -> bytes:
     cleaned = str(raw_b64 or "").strip()
     if "," in cleaned and cleaned.startswith("data:"):
         cleaned = cleaned.split(",", 1)[1]
-    img_bytes = base64.b64decode(cleaned)
+    if not cleaned or len(cleaned) > 12 * 1024 * 1024:
+        raise ValueError("Image payload is empty or too large")
+    try:
+        img_bytes = base64.b64decode(cleaned, validate=True)
+    except (ValueError, base64.binascii.Error) as exc:
+        raise ValueError("Invalid base64 image payload") from exc
+    if not img_bytes or len(img_bytes) > 8 * 1024 * 1024:
+        raise ValueError("Image must be 8 MB or smaller")
     with Image.open(io.BytesIO(img_bytes)) as im:
+        if im.format not in {"JPEG", "PNG", "WEBP"}:
+            raise ValueError("Unsupported image format")
+        if im.width < 1 or im.height < 1 or im.width * im.height > 20_000_000:
+            raise ValueError("Image dimensions are too large")
+        im.load()
         rgb = im.convert("RGB")
         out = io.BytesIO()
         rgb.save(out, format="JPEG", quality=88, optimize=True)
@@ -3559,9 +3571,11 @@ def admin_upload_episode_cover_api(req: AdminUploadEpCoverRequest, request: Requ
             "ep_number": ep_num,
             "cover_version": ver,
         }
-    except Exception as exc:
+    except ValueError as exc:
+        return JSONResponse(status_code=400, content={"detail": str(exc)})
+    except Exception:
         log.exception("Failed to upload episode cover via API")
-        return JSONResponse(status_code=500, content={"detail": str(exc)})
+        return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 
 @app.post("/api/admin/upload-album")
@@ -3617,9 +3631,11 @@ def admin_upload_album_photo_api(req: AdminUploadAlbumRequest, request: Request)
             "slot": slot,
             "version": ver,
         }
-    except Exception as exc:
+    except ValueError as exc:
+        return JSONResponse(status_code=400, content={"detail": str(exc)})
+    except Exception:
         log.exception("Failed to upload album photo via API")
-        return JSONResponse(status_code=500, content={"detail": str(exc)})
+        return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 
 @app.post("/api/admin/delete-album")
