@@ -2106,6 +2106,17 @@
   };
 
   const API_URL = `${API_BASE}/api/dramas`;
+
+  function escapeHtml(value) {
+    return String(value ?? "").replace(/[&<>"']/g, (char) => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;"
+    })[char]);
+  }
+
   const PAGE_SIZE = 9;
   const SLIDER_MAX_ITEMS = 6;
   const SPLASH_DURATION_MS = 1150;
@@ -2413,20 +2424,20 @@
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      document.getElementById("stat-total-users").textContent = `${data.total_users || 0} នាក់`;
-      document.getElementById("stat-new-today").textContent = `+${data.new_users_today || 0} នាក់`;
-      document.getElementById("stat-new-7d").textContent = `+${data.new_users_7d || 0} នាក់`;
-      document.getElementById("stat-active-today").textContent = `${data.active_users_today || 0} នាក់`;
+      document.getElementById("stat-total-users").textContent = `${escapeHtml(data.total_users || 0)} នាក់`;
+      document.getElementById("stat-new-today").textContent = `+${escapeHtml(data.new_users_today || 0)} នាក់`;
+      document.getElementById("stat-new-7d").textContent = `+${escapeHtml(data.new_users_7d || 0)} នាក់`;
+      document.getElementById("stat-active-today").textContent = `${escapeHtml(data.active_users_today || 0)} នាក់`;
 
       const ns = data.notif_stats || {};
       const notifBox = document.getElementById("stat-notif-box");
       notifBox.innerHTML = `
         <div><strong>🔔 ស្ថិតិការផ្ញើ Notification (User Bot Chat)៖</strong></div>
-        <div>• ចំនួនដងផ្ញើសរុប៖ <strong>${ns.total_broadcasts || 0} ដង</strong></div>
-        <div>• សារផ្ញើជោគជ័យសរុប៖ <strong>${ns.total_delivered || 0} សារ</strong></div>
-        <div>• រឿងផ្ញើចុងក្រោយ៖ <strong>${ns.last_drama || "មិនទាន់មាន"}</strong></div>
-        <div>• លទ្ធផលចុងក្រោយ៖ ជោគជ័យ <strong>${ns.last_sent_ok || 0}</strong> / បរាជ័យ <strong>${ns.last_failed || 0}</strong></div>
-        <div>• ពេលវេលាចុងក្រោយ៖ <span>${ns.last_time || "មិនទាន់មាន"}</span></div>
+        <div>• ចំនួនដងផ្ញើសរុប៖ <strong>${escapeHtml(ns.total_broadcasts || 0)} ដង</strong></div>
+        <div>• សារផ្ញើជោគជ័យសរុប៖ <strong>${escapeHtml(ns.total_delivered || 0)} សារ</strong></div>
+        <div>• រឿងផ្ញើចុងក្រោយ៖ <strong>${escapeHtml(ns.last_drama || "មិនទាន់មាន")}</strong></div>
+        <div>• លទ្ធផលចុងក្រោយ៖ ជោគជ័យ <strong>${escapeHtml(ns.last_sent_ok || 0)}</strong> / បរាជ័យ <strong>${escapeHtml(ns.last_failed || 0)}</strong></div>
+        <div>• ពេលវេលាចុងក្រោយ៖ <span>${escapeHtml(ns.last_time || "មិនទាន់មាន")}</span></div>
       `;
     } catch (_) {
       document.getElementById("stat-notif-box").textContent = "មិនអាចទាញយកស្ថិតិបានទេ។";
