@@ -67,6 +67,7 @@ TAGS_STORE_PREFIX = "__TAGS__"
 GIF_STORE_PREFIX = "__GIF__"
 ALBUM_STORE_PREFIX = "__ALBUM__"
 EP_COV_STORE_PREFIX = "__EPCOV__"
+EP_DUR_STORE_PREFIX = "__EPDUR__"
 
 REQ_LIMIT_KEY = "__REQ_LIMIT__"
 USER_START_KEY = "__USER_START__"
@@ -1563,6 +1564,7 @@ def fetch_all_drama_metadata_maps() -> dict:
     codes = {}
     upload_dates = {}
     durations = {}
+    episode_durations = {}
     tags_map = {}
     gifs_map = {}
     categories = set()
@@ -1631,6 +1633,17 @@ def fetch_all_drama_metadata_maps() -> dict:
                 if real_title and val:
                     upload_dates[real_title] = val
                 continue
+            if t.startswith(EP_DUR_STORE_PREFIX):
+                raw_key = t[len(EP_DUR_STORE_PREFIX):].strip()
+                try:
+                    real_title, ep_text = raw_key.rsplit("__", 1)
+                    ep_num = int(ep_text)
+                    seconds = int(str(r.get("cover_file_id") or "").strip())
+                    if real_title and ep_num > 0 and seconds > 0:
+                        episode_durations.setdefault(real_title, {})[ep_num] = seconds
+                except (TypeError, ValueError):
+                    pass
+                continue
             if t.startswith(DUR_STORE_PREFIX):
                 real_title = t[len(DUR_STORE_PREFIX):].strip()
                 val = str(r.get("cover_file_id") or "").strip()
@@ -1676,6 +1689,7 @@ def fetch_all_drama_metadata_maps() -> dict:
         "codes": codes,
         "upload_dates": upload_dates,
         "durations": durations,
+        "episode_durations": episode_durations,
         "tags": tags_map,
         "gifs": gifs_map,
         "categories": categories,
@@ -3597,6 +3611,7 @@ def list_dramas(user_id: Optional[int] = Query(default=None)):
         codes_map = meta["codes"]
         upload_dates_map = meta["upload_dates"]
         durations_map = meta["durations"]
+        episode_durations_map = meta.get("episode_durations", {})
         tags_map = meta["tags"]
         gifs_map = meta["gifs"]
         extra_cats = meta["categories"]
@@ -3605,12 +3620,17 @@ def list_dramas(user_id: Optional[int] = Query(default=None)):
 
         views_map = fetch_drama_views_map()
         dramas = OrderedDict()
+        episode_counts = {}
         categories_set = set(extra_cats)
 
         for row in response.data or []:
             title = (row.get("drama_title") or "").strip()
             if not title or is_internal_key(title):
                 continue
+
+            episode_num = int(row.get("ep_number") or 0)
+            if episode_num > 0:
+                episode_counts[title] = episode_counts.get(title, 0) + 1
 
             cat = (row.get("category") or "").strip()
             if cat:
@@ -3651,12 +3671,21 @@ def list_dramas(user_id: Optional[int] = Query(default=None)):
         for title, item in dramas.items():
             d_code = codes_map.get(title, "")
             u_date = upload_dates_map.get(title, get_cambodia_date_ddmmyyyy())
-            dur_sec = durations_map.get(title, 0)
+            ep_count = episode_counts.get(title, 0)
+            per_episode = episode_durations_map.get(title, {})
+            episode_numbers = {int(row.get("ep_number") or 0) for row in (response.data or []) if (row.get("drama_title") or "").strip() == title}
+            if ep_count > 0 and all(n > 0 and n in per_episode for n in episode_numbers):
+                dur_sec = sum(int(per_episode[n]) for n in episode_numbers)
+            elif ep_count == 1 and durations_map.get(title, 0) > 0:
+                dur_sec = int(durations_map[title])
+            else:
+                dur_sec = 0
             gif_ver = gifs_map.get(title)
             item["drama_code"] = d_code
             item["upload_date"] = u_date
             item["duration_seconds"] = dur_sec
             item["duration_text"] = format_video_duration(dur_sec) if dur_sec > 0 else ""
+            item["episode_count"] = ep_count
             item["has_gif"] = bool(gif_ver)
             item["gif_version"] = gif_ver or "v1"
             item["search_tokens"] = build_smart_search_tokens(
@@ -4048,6 +4077,7 @@ def get_user_favorites_api(user_id: int):
         codes_map = meta["codes"]
         upload_dates_map = meta["upload_dates"]
         durations_map = meta["durations"]
+        episode_durations_map = meta.get("episode_durations", {})
         tags_map = meta["tags"]
         gifs_map = meta["gifs"]
         views_map = fetch_drama_views_map()
@@ -4619,6 +4649,7 @@ def get_user_history_api(user_id: int):
         codes_map = meta["codes"]
         upload_dates_map = meta["upload_dates"]
         durations_map = meta["durations"]
+        episode_durations_map = meta.get("episode_durations", {})
         tags_map = meta["tags"]
         gifs_map = meta["gifs"]
         views_map = fetch_drama_views_map()
