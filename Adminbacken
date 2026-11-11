@@ -28,6 +28,7 @@ from telebot.types import (
     KeyboardButton,
     InlineKeyboardMarkup,
     InlineKeyboardButton,
+    CopyTextButton,
     InputMediaPhoto,
 )
 from fastapi import FastAPI, Request, HTTPException, BackgroundTasks
@@ -1597,8 +1598,8 @@ def broadcast_new_drama_notification_async(
     custom_cover_msg_id: Optional[int] = None,
 ):
     """
-    Point 3.2: ផ្ញើ Notification រឿងថ្មីទៅកាន់ User Bot Chat ជារូប Cover (អាចប្រើរូប Cover ដែល Admin ទើប Upload ថ្មី
-    ឬរូប Cover រឿងដែលមានស្រាប់) ភ្ជាប់ជាមួយ ចំណងជើងរឿង + លេខកូដ (ឧ. XF-000001) និងប៊ូតុង ▶️ មើលឥឡូវនេះ។
+    Point 3.2: ផ្ញើ Notification រឿងថ្មីជារូប Cover ជាមួយចំណងជើង កូដដែលអាចចុចចម្លងបាន
+    និងសារណែនាំឱ្យបើក Mini App ដើម្បីស្វែងរករឿង។
     """
     def _worker():
         try:
@@ -1666,18 +1667,14 @@ def broadcast_new_drama_notification_async(
                 except Exception:
                     cover_bytes = None
 
-            # ប៊ូតុងមើលវីដេអូ (▶️ មើលឥឡូវនេះ) រក្សាទុកដដែល
-            markup = InlineKeyboardMarkup()
-            watch_token = create_notification_watch_token_for_user_bot(drama_title)
-            if watch_token:
-                markup.add(
-                    InlineKeyboardButton(
-                        "▶️ មើលឥឡូវនេះ",
-                        callback_data=f"notif_watch_{watch_token}",
-                    )
+            # ប៊ូតុងនេះប្រើសម្រាប់ចម្លងកូដរឿងប៉ុណ្ណោះ មិនមានប៊ូតុងមើលរឿងទេ។
+            copy_markup = InlineKeyboardMarkup()
+            copy_markup.add(
+                InlineKeyboardButton(
+                    "📋 ចម្លងកូដ",
+                    copy_text=CopyTextButton(text=drama_code or "XF-000001"),
                 )
-            if not markup.keyboard:
-                markup = None
+            )
 
             escaped_title = html.escape(drama_title)
             escaped_code = html.escape(drama_code or "XF-000001")
@@ -1685,7 +1682,8 @@ def broadcast_new_drama_notification_async(
                 f"🔥 <b>រឿងថ្មីទើបមកដល់ក្នុង {CHANNEL_DISPLAY_NAME}!</b>\n"
                 f"<b>{escaped_title}</b>\n"
                 f"<code>{escaped_code}</code>\n"
-                f"👇 ចុចប៊ូតុងខាងក្រោម ដើម្បីទទួលវីដេអូ!"
+                f"📋 ចុច «ចម្លងកូដ» ដើម្បី Copy កូដ។\n"
+                f"✨ សូមបើក Mini App ដើម្បីស្វែងរក និងមើលរឿងនេះ។"
             )
 
             sent_ok = 0
@@ -1702,7 +1700,7 @@ def broadcast_new_drama_notification_async(
                             photo=cached_user_bot_photo_id,
                             caption=caption_text,
                             parse_mode="HTML",
-                            reply_markup=markup,
+                            reply_markup=copy_markup,
                         )
                         delivered = True
                     except Exception:
@@ -1717,7 +1715,7 @@ def broadcast_new_drama_notification_async(
                             photo=bio,
                             caption=caption_text,
                             parse_mode="HTML",
-                            reply_markup=markup,
+                            reply_markup=copy_markup,
                         )
                         if getattr(sent_msg, "photo", None):
                             cached_user_bot_photo_id = sent_msg.photo[-1].file_id
@@ -1733,7 +1731,7 @@ def broadcast_new_drama_notification_async(
                             message_id=int(cover_msg_id),
                             caption=caption_text,
                             parse_mode="HTML",
-                            reply_markup=markup,
+                            reply_markup=copy_markup,
                         )
                         delivered = True
                     except Exception:
@@ -1745,7 +1743,7 @@ def broadcast_new_drama_notification_async(
                             chat_id=uid,
                             text=caption_text,
                             parse_mode="HTML",
-                            reply_markup=markup,
+                            reply_markup=copy_markup,
                         )
                         delivered = True
                     except Exception:
