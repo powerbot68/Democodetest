@@ -3821,12 +3821,13 @@ def list_drama_episodes(
             duration_rows = (
                 supabase.table("drama_covers")
                 .select("drama_title, cover_file_id")
-                .like("drama_title", f"{duration_prefix}%")
                 .execute()
             )
             for duration_row in (duration_rows.data or []):
                 duration_key = str(duration_row.get("drama_title") or "")
-                suffix = duration_key[len(duration_prefix):] if duration_key.startswith(duration_prefix) else ""
+                if not duration_key.startswith(duration_prefix):
+                    continue
+                suffix = duration_key[len(duration_prefix):]
                 raw_seconds = str(duration_row.get("cover_file_id") or "").strip()
                 if suffix.isdigit() and raw_seconds.isdigit() and int(raw_seconds) > 0:
                     per_episode_durations[int(suffix)] = int(raw_seconds)
