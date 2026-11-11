@@ -2192,8 +2192,14 @@
   const languageObserver = new MutationObserver(records => {
     if (uiLanguage !== "en") return;
     records.forEach(record => {
-      if (record.type === "characterData") translateNode(record.target);
-      else record.addedNodes.forEach(translateNode);
+      if (record.type === "characterData") {
+        const node = record.target;
+        if (originalTextNodes.has(node)) {
+          const saved = originalTextNodes.get(node);
+          if (node.nodeValue !== translateText(saved)) originalTextNodes.set(node, node.nodeValue);
+        }
+        translateNode(node);
+      } else record.addedNodes.forEach(translateNode);
     });
   });
   languageObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
