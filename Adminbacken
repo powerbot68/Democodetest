@@ -45,6 +45,7 @@ BOT_TOKEN = (
     or os.getenv("BOT_TOKEN", "").strip()
 )
 USER_BOT_TOKEN_ENV = os.getenv("USER_BOT_TOKEN", "").strip()
+INTERNAL_API_SECRET = (os.getenv("INTERNAL_API_SECRET", "") or "").strip()
 
 MINI_APP_URL = (
     os.getenv("MINI_APP_URL", "").strip()
@@ -486,6 +487,7 @@ def save_required_channel_config_to_db(
             requests.post(
                 f"{base_url}/api/internal/channel-config",
                 json={"channel_id": new_id, "channel_link": new_link},
+                headers={"X-Internal-API-Key": INTERNAL_API_SECRET},
                 timeout=5,
             )
         except Exception:
@@ -1582,21 +1584,6 @@ def enqueue_notification_for_user_bot(
         else:
             supabase.table("drama_covers").insert(payload).execute()
 
-        base_url = get_resolved_mini_app_url()
-        if base_url:
-            try:
-                requests.post(
-                    f"{base_url}/api/internal/broadcast-notification",
-                    json={
-                        "drama_title": drama_title,
-                        "admin_chat_id": int(admin_chat_id),
-                        "custom_cover_msg_id": int(custom_cover_msg_id) if custom_cover_msg_id else None,
-                        "custom_cover_file_id": custom_cover_file_id or None,
-                    },
-                    timeout=5,
-                )
-            except Exception:
-                pass
         return True
     except Exception:
         log.exception("Failed to enqueue notification for User Bot")
@@ -1658,9 +1645,6 @@ def broadcast_new_drama_notification_async(
 
             user_bot_client = telebot.TeleBot(real_user_bot_token, threaded=False)
             user_ids = get_all_started_user_ids()
-            dur = get_drama_duration_from_db(drama_title)
-            dur_str = f" | ⏱️ រយៈពេល៖ {format_video_duration(dur)}" if dur > 0 else ""
-
             cov_res = (
                 supabase.table("drama_covers")
                 .select("cover_file_id, cover_channel_msg_id")
@@ -1699,8 +1683,8 @@ def broadcast_new_drama_notification_async(
             escaped_code = html.escape(drama_code or "XF-000001")
             caption_text = (
                 f"🔥 <b>រឿងថ្មីទើបមកដល់ក្នុង {CHANNEL_DISPLAY_NAME}!</b>\n"
-                f"🎬 ចំណងជើង៖ <b>{escaped_title}</b>\n"
-                f"🆔 លេខកូដ៖ <code>{escaped_code}</code>{dur_str}\n"
+                f"<b>{escaped_title}</b>\n"
+                f"<code>{escaped_code}</code>\n"
                 f"👇 ចុចប៊ូតុងខាងក្រោម ដើម្បីទទួលវីដេអូ!"
             )
 
