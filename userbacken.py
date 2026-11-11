@@ -3245,16 +3245,23 @@ app.add_middleware(
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
     content_length = request.headers.get("content-length", "")
-    try:
-        if content_length and int(content_length) > 15 * 1024 * 1024:
+    if content_length:
+        try:
+            parsed_content_length = int(content_length)
+        except ValueError:
             response = JSONResponse(
-                status_code=413,
-                content={"detail": "Request body is too large"},
+                status_code=400, content={"detail": "Invalid Content-Length"}
             )
         else:
-            response = await call_next(request)
-    except ValueError:
-        response = JSONResponse(status_code=400, content={"detail": "Invalid Content-Length"})
+            if parsed_content_length > 15 * 1024 * 1024:
+                response = JSONResponse(
+                    status_code=413,
+                    content={"detail": "Request body is too large"},
+                )
+            else:
+                response = await call_next(request)
+    else:
+        response = await call_next(request)
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
     response.headers.setdefault(
