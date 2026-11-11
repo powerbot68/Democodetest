@@ -5086,7 +5086,23 @@ app = FastAPI(
 
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
-    response = await call_next(request)
+    content_length = request.headers.get("content-length", "")
+    if content_length:
+        try:
+            parsed_content_length = int(content_length)
+        except ValueError:
+            response = JSONResponse(
+                status_code=400, content={"detail": "Invalid Content-Length"}
+            )
+        else:
+            if parsed_content_length > 2 * 1024 * 1024:
+                response = JSONResponse(
+                    status_code=413, content={"detail": "Request body is too large"}
+                )
+            else:
+                response = await call_next(request)
+    else:
+        response = await call_next(request)
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
     response.headers.setdefault(
