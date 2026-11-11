@@ -3952,8 +3952,20 @@
 
     // A numeric ID from initDataUnsafe or the URL is not proof of Telegram identity.
     // Require Telegram's signed initData before calling the authenticated API.
-    if (userId && !signedInitData) {
-      alert("មិនអាចផ្ទៀងផ្ទាត់គណនី Telegram បានទេ។ សូមបិទ Mini App ហើយបើកវាឡើងវិញពីក្នុង Telegram Bot។");
+    // If Telegram did not provide initData, use Telegram's signed Web App
+    // message flow. The bot identifies the sender from message.chat.id,
+    // not from a user_id supplied by the browser.
+    if (tg && typeof tg.sendData === "function" && !signedInitData) {
+      try {
+        tg.sendData(JSON.stringify({
+          action: "select_drama",
+          title: titleText,
+          ep_number: epNumber
+        }));
+      } catch (error) {
+        console.error("Telegram sendData fallback failed:", error);
+        alert("មិនអាចផ្ញើសំណើទៅ Telegram Bot បានទេ។ សូមបើក Mini App ពីក្នុង Bot ម្តងទៀត។");
+      }
       return;
     }
 
