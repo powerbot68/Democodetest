@@ -2002,10 +2002,25 @@ def should_show_episode_buttons(user_id: int) -> bool:
     return bool(user_drama_multi_ep.get(user_id, False))
 
 
-def get_bottom_menu(user_id=None, has_active_drama: Optional[bool] = None):
-    if has_active_drama is None:
-        has_active_drama = should_show_episode_buttons(user_id) if user_id else False
+def get_video_controls_keyboard(user_id: int, has_active_drama: bool = True):
+    """Inline controls displayed directly below the currently playing video."""
+    if not has_active_drama:
+        return None
 
+    markup = InlineKeyboardMarkup(row_width=2)
+    markup.row(
+        InlineKeyboardButton(BTN_PREV_EP, callback_data="video_prev"),
+        InlineKeyboardButton(BTN_NEXT_EP, callback_data="video_next"),
+    )
+    markup.row(
+        InlineKeyboardButton(BTN_ALL_EPS, callback_data="video_all_eps"),
+    )
+    return markup
+
+
+def get_bottom_menu(user_id=None, has_active_drama: Optional[bool] = None):
+    # Episode navigation is attached to each video as an inline keyboard.
+    # Keep only the general actions in Telegram's persistent reply keyboard.
     markup = ReplyKeyboardMarkup(
         resize_keyboard=True,
         is_persistent=True,
@@ -2022,24 +2037,12 @@ def get_bottom_menu(user_id=None, has_active_drama: Optional[bool] = None):
     else:
         mini_app_btn = KeyboardButton(BTN_MINI_APP)
 
-    if has_active_drama:
-        markup.row(
-            KeyboardButton(BTN_PREV_EP),
-            KeyboardButton(BTN_NEXT_EP),
-        )
-        markup.row(
-            KeyboardButton(BTN_ALL_EPS),
-            mini_app_btn,
-        )
-    else:
-        markup.row(mini_app_btn)
-
+    markup.row(mini_app_btn)
     markup.row(
         KeyboardButton(BTN_REFRESH),
         KeyboardButton(BTN_CLEAR),
     )
     return markup
-
 
 def send_temp_notice(user_id, text, delay=2.5):
     def _worker():
@@ -2386,7 +2389,7 @@ def send_drama_episode(user_id, drama_title, ep_number, success_notice_message_i
             caption=video_caption,
             parse_mode="HTML",
             protect_content=True,
-            reply_markup=get_bottom_menu(user_id, has_active_drama=is_multi_ep),
+            reply_markup=get_video_controls_keyboard(user_id, has_active_drama=is_multi_ep),
         )
         user_last_message[user_id] = sent.message_id
         track_trash_message(user_id, sent.message_id)
@@ -3076,6 +3079,59 @@ def handle_watch_ep(call):
     except Exception:
         log.exception("Watch episode callback failed")
         bot.answer_callback_query(call.id, "មានបញ្ហាក្នុងការបើកភាគ។")
+
+
+@bot.callback_query_handler(
+    func=lambda call: bool(call.data) and call.data in {"video_prev", "video_next", "video_all_eps"}
+)
+def handle_video_controls(call):
+    """Handle the inline controls shown underneath the current video."""
+    try:
+        if not call.message or call.message.chat.type != "private":
+            bot.answer_callback_query(call.id, "សូមប្រើប៊ូតុងនេះក្នុង Chat Bot ផ្ទាល់។")
+            return
+
+        user_id = int(call.from_user.id)
+        title, current_ep = ensure_user_state(user_id)
+        if not title or not current_ep:
+            bot.answer_callback_query(call.id, "សូមជ្រើសរើសរឿងពី Mini App ជាមុនសិន។")
+            return
+
+        if call.data == "video_prev":
+            target_ep = int(current_ep) - 1
+            if target_ep < 1:
+                bot.answer_callback_query(call.id, "នេះជាភាគដំបូងហើយ!")
+                return
+            bot.answer_callback_query(call.id)
+            send_drama_episode(user_id, title, target_ep)
+            return
+
+        if call.data == "video_next":
+            bot.answer_callback_query(call.id)
+            send_drama_episode(user_id, title, int(current_ep) + 1)
+            return
+
+        total = len(get_episode_rows(title))
+        if total <= 1:
+            bot.answer_callback_query(call.id, "រឿងនេះជារឿងមួយភាគចប់។")
+            return
+
+        per_page = 6
+        initial_page = max(0, (int(current_ep) - 1) // per_page)
+        bot.answer_callback_query(call.id)
+        sent_list = bot.send_message(
+            user_id,
+            f"បញ្ជីភាគ (អ្នកមើលដល់ភាគ {current_ep})",
+            reply_markup=get_episodes_list_keyboard(initial_page, total),
+        )
+        track_trash_message(user_id, sent_list.message_id)
+
+    except Exception:
+        log.exception("Video inline controls failed")
+        try:
+            bot.answer_callback_query(call.id, "មានបញ្ហាក្នុងការបញ្ជា។ សូមសាកល្បងម្ដងទៀត។")
+        except Exception:
+            pass
 
 
 @bot.message_handler(content_types=["web_app_data"])
