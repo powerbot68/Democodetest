@@ -3,6 +3,7 @@ import re
 import io
 import html
 import base64
+import binascii
 import logging
 import threading
 import json
@@ -3316,7 +3317,7 @@ def decode_base64_image_bytes(raw_b64: str) -> bytes:
         raise ValueError("Image payload is empty or too large")
     try:
         img_bytes = base64.b64decode(cleaned, validate=True)
-    except (ValueError, base64.binascii.Error) as exc:
+    except (ValueError, binascii.Error) as exc:
         raise ValueError("Invalid base64 image payload") from exc
     if not img_bytes or len(img_bytes) > 8 * 1024 * 1024:
         raise ValueError("Image must be 8 MB or smaller")
@@ -3370,11 +3371,16 @@ def health():
 def get_verified_telegram_user_id(request: Request) -> Optional[int]:
     """Return the Telegram user ID only when Telegram WebApp initData is valid."""
     raw_init_data = request.headers.get("X-Telegram-Init-Data", "").strip()
-    if not raw_init_data or not BOT_TOKEN:
+    if not raw_init_data or len(raw_init_data) > 16 * 1024 or not BOT_TOKEN:
         return None
 
     try:
-        pairs = parse_qsl(raw_init_data, keep_blank_values=True, strict_parsing=True)
+        pairs = parse_qsl(
+            raw_init_data,
+            keep_blank_values=True,
+            strict_parsing=True,
+            max_num_fields=50,
+        )
         data = dict(pairs)
         received_hash = data.pop("hash", "")
         if not received_hash or len(received_hash) != 64:
