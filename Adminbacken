@@ -2473,12 +2473,16 @@ def update_drama_title_in_db(old_title, new_title):
 
         # Preserve per-episode duration metadata when the drama title changes.
         old_duration_prefix = EP_DUR_STORE_PREFIX + old_title + "__"
-        duration_rows = supabase.table("drama_covers").select("drama_title").like("drama_title", old_duration_prefix + "%").execute()
+        duration_rows = supabase.table("drama_covers").select("drama_title").execute()
         for duration_row in (duration_rows.data or []):
             old_key = str(duration_row.get("drama_title") or "")
-            suffix = old_key[len(old_duration_prefix):] if old_key.startswith(old_duration_prefix) else ""
+            if not old_key.startswith(old_duration_prefix):
+                continue
+            suffix = old_key[len(old_duration_prefix):]
             if suffix.isdigit():
-                supabase.table("drama_covers").update({"drama_title": EP_DUR_STORE_PREFIX + new_title + "__" + suffix}).eq("drama_title", old_key).execute()
+                supabase.table("drama_covers").update(
+                    {"drama_title": EP_DUR_STORE_PREFIX + new_title + "__" + suffix}
+                ).eq("drama_title", old_key).execute()
 
         # ប្ដូរឈ្មោះរូប Album ទាំង ៣
         for slot in (1, 2, 3):
@@ -2678,7 +2682,15 @@ def delete_entire_drama_in_db(drama_title):
     supabase.table("drama_covers").delete().in_("drama_title", cov_keys).execute()
     try:
         supabase.table("drama_covers").delete().like("drama_title", f"{EP_COV_STORE_PREFIX}{drama_title}__%").execute()
-        supabase.table("drama_covers").delete().like("drama_title", f"{EP_DUR_STORE_PREFIX}{drama_title}__%").execute()
+        duration_prefix = f"{EP_DUR_STORE_PREFIX}{drama_title}__"
+        duration_rows = supabase.table("drama_covers").select("drama_title").execute()
+        duration_keys = [
+            str(row.get("drama_title") or "")
+            for row in (duration_rows.data or [])
+            if str(row.get("drama_title") or "").startswith(duration_prefix)
+        ]
+        if duration_keys:
+            supabase.table("drama_covers").delete().in_("drama_title", duration_keys).execute()
 
         # Remove notification watch tokens that point to the deleted drama.
         # Tokens are stored as __NOTIF_WATCH__<token>; their target is JSON in cover_file_id.
