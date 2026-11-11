@@ -3669,7 +3669,7 @@ def list_dramas(request: Request, user_id: Optional[int] = Query(default=None)):
             cached_copy = dict(DRAMAS_LIST_CACHE["payload"])
             # Keep the newest-first order already stored in the cache.
             cached_copy["items"] = list(cached_copy.get("items") or [])
-            cached_copy["is_admin"] = is_admin_user(user_id) if user_id else False
+            cached_copy["is_admin"] = is_admin_user(verified_user_id) if verified_user_id else False
             cached_copy["required_channel_link"] = get_required_channel_link()
             cached_copy["channel_name"] = CHANNEL_DISPLAY_NAME
             return JSONResponse(
@@ -3795,7 +3795,7 @@ def list_dramas(request: Request, user_id: Optional[int] = Query(default=None)):
             "top_trending_titles": top_trending_titles,
             "categories": sorted(list(categories_set)),
             "count": len(sorted_items),
-            "is_admin": is_admin_user(user_id) if user_id else False,
+            "is_admin": is_admin_user(verified_user_id) if verified_user_id else False,
             "required_channel_link": get_required_channel_link(),
             "channel_name": CHANNEL_DISPLAY_NAME,
         }
@@ -3993,6 +3993,8 @@ def rate_drama_api(req: RateDramaRequest, request: Request):
             "rating_count": rating_count,
             "user_rating": user_rating,
         }
+    except HTTPException:
+        raise
     except Exception as exc:
         log.exception("Rate drama API failed")
         return JSONResponse(
@@ -4115,6 +4117,8 @@ def submit_user_request_api(req: UserFeedbackRequest, request: Request):
             "cambodia_date": get_cambodia_date_str(),
         }
 
+    except HTTPException:
+        raise
     except Exception as exc:
         log.exception("Submit user request API failed")
         return JSONResponse(
@@ -4146,6 +4150,8 @@ def toggle_favorite_api(req: FavoriteDramaRequest, request: Request):
                 .execute()
             )
         return {"status": "ok", "is_favorite": req.is_favorite}
+    except HTTPException:
+        raise
     except Exception as exc:
         log.exception("Toggle favorite API failed")
         return JSONResponse(
@@ -4263,6 +4269,8 @@ def get_user_favorites_api(user_id: int, request: Request):
             headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"},
         )
 
+    except HTTPException:
+        raise
     except Exception:
         log.exception("Favorites API failed")
         return JSONResponse(
@@ -4299,6 +4307,8 @@ def select_drama_api(req: SelectDramaRequest, request: Request):
             daemon=True,
         ).start()
         return {"status": "ok"}
+    except HTTPException:
+        raise
     except Exception as exc:
         log.exception("Select drama API failed")
         return JSONResponse(
@@ -4848,6 +4858,8 @@ def get_user_history_api(user_id: int, request: Request):
             headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"},
         )
 
+    except HTTPException:
+        raise
     except Exception:
         log.exception("History API failed")
         return JSONResponse(
