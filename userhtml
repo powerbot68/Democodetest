@@ -623,6 +623,28 @@
       pointer-events: none;
     }
 
+    /* Blur only the bottom-right area of legacy covers with burned-in duration text. */
+    .cover-wrap.cover-needs-blur::before,
+    .detail-cover-wrap.cover-needs-blur::before {
+      content: "";
+      position: absolute;
+      right: 0;
+      bottom: 0;
+      width: 52%;
+      height: 24%;
+      background: rgba(0, 0, 0, 0.10);
+      -webkit-backdrop-filter: blur(9px);
+      backdrop-filter: blur(9px);
+      pointer-events: none;
+      z-index: 4;
+    }
+
+    .cover-wrap.cover-needs-blur .cover-views,
+    .cover-wrap.cover-needs-blur .cover-play-icon {
+      z-index: 5;
+    }
+
+
     .spinner-ring {
       position: absolute;
       inset: 0;
@@ -3159,6 +3181,7 @@
 
     const coverWrap = document.createElement("div");
     coverWrap.className = "cover-wrap";
+    if (drama?.cover_blur_legacy) coverWrap.classList.add("cover-needs-blur");
 
     const spinner = document.createElement("div");
     spinner.className = "spinner-ring";
@@ -4022,6 +4045,7 @@
     }
 
     detailTitle.textContent = titleText;
+    detailCoverWrap.classList.toggle("cover-needs-blur", Boolean(drama?.cover_blur_legacy));
     updateDetailCodeAndDateBadges(initialCode, initialDate, initialCat, initialDuration);
 
     resetDetailGifPreview();
@@ -4104,6 +4128,7 @@
         adminStatsBtn?.classList.remove("hidden");
       }
 
+      detailCoverWrap.classList.toggle("cover-needs-blur", Boolean(data.cover_blur_legacy));
       const episodes = Array.isArray(data.episodes) ? data.episodes : [];
       const lastEp = data.last_ep ? Number(data.last_ep) : null;
 
