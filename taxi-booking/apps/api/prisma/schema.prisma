@@ -1,0 +1,143 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole { CUSTOMER DRIVER ADMIN }
+enum BookingStatus { SEARCHING ACCEPTED DRIVER_ARRIVING ARRIVED IN_PROGRESS COMPLETED CANCELLED }
+enum PaymentStatus { PENDING PAID FAILED REFUNDED }
+enum VehicleType { TUKTUK CAR SUV VAN }
+
+model User {
+  id           String   @id @default(cuid())
+  telegramId   String   @unique
+  name         String
+  phone        String?
+  role         UserRole @default(CUSTOMER)
+  isActive     Boolean  @default(true)
+  driver       DriverProfile?
+  bookings     Booking[] @relation("CustomerBookings")
+  reviews      Review[] @relation("AuthorReviews")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model DriverProfile {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id])
+  licenseNumber  String?
+  verified       Boolean  @default(false)
+  online         Boolean  @default(false)
+  rating         Float    @default(5)
+  vehicle        Vehicle?
+  bookings       Booking[] @relation("DriverBookings")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Vehicle {
+  id             String      @id @default(cuid())
+  driverId       String      @unique
+  driver         DriverProfile @relation(fields: [driverId], references: [id])
+  type           VehicleType
+  make           String
+  model          String
+  plateNumber    String      @unique
+  color          String?
+  capacity       Int         @default(4)
+}
+
+model Booking {
+  id               String        @id @default(cuid())
+  customerId       String
+  customer         User          @relation("CustomerBookings", fields: [customerId], references: [id])
+  driverId         String?
+  driver           DriverProfile? @relation("DriverBookings", fields: [driverId], references: [id])
+  status           BookingStatus @default(SEARCHING)
+  pickupAddress    String
+  pickupLat        Float
+  pickupLng        Float
+  destinationAddress String
+  destinationLat   Float
+  destinationLng   Float
+  distanceKm       Float
+  estimatedFare    Int
+  finalFare        Int?
+  currency         String        @default("USD")
+  paymentStatus    PaymentStatus @default(PENDING)
+  events           BookingEvent[]
+  review           Review?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+}
+
+model DriverLocation {
+  id          String   @id @default(cuid())
+  driverId    String   @unique
+  latitude    Float
+  longitude   Float
+  heading     Float?
+  updatedAt   DateTime @updatedAt
+}
+
+model BookingEvent {
+  id          String        @id @default(cuid())
+  bookingId   String
+  booking     Booking       @relation(fields: [bookingId], references: [id])
+  status      BookingStatus
+  note        String?
+  createdAt   DateTime      @default(now())
+}
+
+model PricingRule {
+  id             String   @id @default(cuid())
+  name           String
+  vehicleType    VehicleType
+  baseFare       Int
+  perKmFare      Int
+  minimumFare    Int
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+}
+
+model Payment {
+  id          String        @id @default(cuid())
+  bookingId   String
+  provider    String
+  providerRef String?       @unique
+  amount      Int
+  currency    String        @default("USD")
+  status      PaymentStatus @default(PENDING)
+  createdAt   DateTime      @default(now())
+}
+
+model Review {
+  id          String   @id @default(cuid())
+  bookingId   String   @unique
+  booking     Booking  @relation(fields: [bookingId], references: [id])
+  authorId    String
+  author      User     @relation("AuthorReviews", fields: [authorId], references: [id])
+  rating      Int
+  comment     String?
+  createdAt   DateTime @default(now())
+}
+
+model Notification {
+  id          String   @id @default(cuid())
+  userId      String
+  title       String
+  body        String
+  readAt      DateTime?
+  createdAt   DateTime @default(now())
+}
+
+model AdminSetting {
+  key         String   @id
+  value       String
+  updatedAt   DateTime @updatedAt
+}
