@@ -1,0 +1,23 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: taxi
+      POSTGRES_PASSWORD: taxi_dev_password
+      POSTGRES_DB: taxi_booking
+    ports: ["5432:5432"]
+    volumes: [taxi_postgres_data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U taxi -d taxi_booking"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports: ["6379:6379"]
+    volumes: [taxi_redis_data:/data]
+volumes:
+  taxi_postgres_data:
+  taxi_redis_data:
