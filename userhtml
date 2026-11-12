@@ -2392,12 +2392,29 @@
   // SPLASH SCREEN CONTROLLER
   // ============================================================================
 
-  // Play the cinematic splash animation on every Mini App launch.
-  setTimeout(() => hideAppSplash(), SPLASH_MAX_TIMEOUT_MS);
+  const alreadyShownSplashInSession = (() => {
+    try {
+      return sessionStorage.getItem(SPLASH_SHOWN_SESSION_KEY) === "1";
+    } catch (_) {
+      return false;
+    }
+  })();
+
+  if (alreadyShownSplashInSession) {
+    appSplash?.classList.add("hide");
+    appRoot?.classList.add("app-launched");
+    splashDismissScheduled = true;
+  } else {
+    setTimeout(() => hideAppSplash(), SPLASH_MAX_TIMEOUT_MS);
+  }
 
   function hideAppSplash() {
     if (splashDismissScheduled) return;
     splashDismissScheduled = true;
+
+    try {
+      sessionStorage.setItem(SPLASH_SHOWN_SESSION_KEY, "1");
+    } catch (_) {}
 
     const elapsed = performance.now() - splashMountedAt;
     const waitMs = Math.max(0, SPLASH_DURATION_MS - elapsed);
@@ -4090,7 +4107,7 @@
 
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.className = "ep-card";
+    btn.className = "ep-card" + (epNum === targetEp ? " current" : "");
 
     const thumbWrap = document.createElement("div");
     thumbWrap.className = "ep-thumb-wrap";
@@ -4121,6 +4138,12 @@
     numTxt.textContent = `ភាគ ${epNum}`;
     numBar.appendChild(numTxt);
 
+    if (lastEp && epNum === lastEp) {
+      const dot = document.createElement("span");
+      dot.className = "latest-dot";
+      dot.setAttribute("aria-label", "ភាគដែលបានមើលចុងក្រោយ");
+      numBar.appendChild(dot);
+    }
 
     btn.append(thumbWrap, numBar);
     btn.addEventListener("click", () => {
@@ -4303,9 +4326,11 @@
       } else {
         episodesSection.classList.remove("hidden");
         epCount.textContent = `${episodes.length} ភាគ`;
-        detailSub.textContent = `សរុប ${episodes.length} ភាគ`;
+        detailSub.textContent = lastEp
+          ? `ធ្លាប់មើលដល់ភាគ ${lastEp} • សរុប ${episodes.length} ភាគ`
+          : `សរុប ${episodes.length} ភាគ`;
 
-        const labelText = lastEp ? "បន្តមើល" : `មើលភាគ ${targetEp}`;
+        const labelText = lastEp ? `បន្តភាគ ${lastEp}` : `មើលភាគ ${targetEp}`;
         continueBtn.innerHTML = `${PLAY_LINE_ICON}<span>${labelText}</span>`;
         continueBtn.disabled = false;
         continueBtn.onclick = () => playEpisodeInBot(titleText, targetEp, continueBtn);
