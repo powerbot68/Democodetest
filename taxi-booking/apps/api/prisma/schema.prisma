@@ -7,10 +7,35 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum UserRole { CUSTOMER DRIVER ADMIN }
-enum BookingStatus { SEARCHING ACCEPTED DRIVER_ARRIVING ARRIVED IN_PROGRESS COMPLETED CANCELLED }
-enum PaymentStatus { PENDING PAID FAILED REFUNDED }
-enum VehicleType { TUKTUK CAR SUV VAN }
+enum UserRole {
+  CUSTOMER
+  DRIVER
+  ADMIN
+}
+
+enum BookingStatus {
+  SEARCHING
+  ACCEPTED
+  DRIVER_ARRIVING
+  ARRIVED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum VehicleType {
+  TUKTUK
+  CAR
+  SUV
+  VAN
+}
 
 model User {
   id           String   @id @default(cuid())
